@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `cancel_pin_hash` text;

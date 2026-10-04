@@ -1,0 +1,10 @@
+{
+  "name": "SAATHI — Safety Assistance \u0026 Alert Technology",
+  "description": "An installable, offline-first, consent-driven emergency safety and intervention PWA for women.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
