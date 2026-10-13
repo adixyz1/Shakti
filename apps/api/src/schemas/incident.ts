@@ -17,9 +17,14 @@ export const locationSampleInputSchema = z.object({
 export const createIncidentSchema = z.object({
   client_request_id: z.string().trim().min(1, 'client_request_id is required').max(128),
   client_created_at: z.string().optional(),
+  queued_offline: z.boolean().optional(),
   location: locationSampleInputSchema.optional(),
   source_trigger: z.string().trim().min(1).max(64).default('button'),
   emergency_type: z.string().trim().min(1).max(64).nullable().optional(),
+});
+
+export const submitIncidentRatingSchema = z.object({
+  score: z.number().int().min(1, 'Score must be between 1 and 5').max(5, 'Score must be between 1 and 5'),
 });
 
 export const cancelIncidentSchema = z.object({

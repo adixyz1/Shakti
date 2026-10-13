@@ -29,6 +29,7 @@ import {
   buildEmergencySmsBody,
   buildSmsFallbackHref,
   cancelQueuedAlert,
+  clearAllOfflineStateOnLogout,
   clearAllQueuedAlerts,
   clearOfflineEmergencyContactsCache,
   computeBackoffDelayMs,
@@ -159,6 +160,7 @@ describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Co
 
     try {
       const agent = request.agent(baseUrl);
+      agent.set('Origin', baseUrl);
       const otpReq = await agent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000001' });
@@ -286,8 +288,10 @@ describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Co
       fireEvent.keyDown(window, { key: 'Escape', shiftKey: true });
     });
 
-    const queuedBeforeCancel = await listQueuedAlerts();
-    expect(queuedBeforeCancel).toHaveLength(1);
+    await waitFor(async () => {
+      const queuedBeforeCancel = await listQueuedAlerts();
+      expect(queuedBeforeCancel).toHaveLength(1);
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId('cancel-window-screen')).toBeTruthy();
@@ -527,11 +531,38 @@ describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Co
     await syncOfflineEmergencyContactsCache(rawContacts, false);
     expect(await getCachedEmergencyContacts()).toHaveLength(0);
 
-    // Re-populate and verify cleared on logout
+    // Re-populate and verify clearAllOfflineStateOnLogout clears IndexedDB queue, contact cache, and Service Worker CacheStorage
     await syncOfflineEmergencyContactsCache(rawContacts, true);
+    await enqueueOfflineAlert({
+      client_request_id: 'req_logout_clear_1',
+      client_created_at: new Date().toISOString(),
+      source_trigger: 'button',
+      emergency_type: null,
+      location: null,
+    });
     expect(await getCachedEmergencyContacts()).toHaveLength(2);
-    await clearOfflineEmergencyContactsCache();
+    expect(await listQueuedAlerts()).toHaveLength(1);
+
+    const deletedCaches: string[] = [];
+    (window as any).caches = {
+      keys: vi
+        .fn()
+        .mockResolvedValue(['workbox-precache-v2', 'saathi-static-assets-v1']),
+      delete: vi.fn(async (key: string) => {
+        deletedCaches.push(key);
+        return true;
+      }),
+    };
+
+    await clearAllOfflineStateOnLogout();
+
     expect(await getCachedEmergencyContacts()).toHaveLength(0);
+    expect(await listQueuedAlerts()).toHaveLength(0);
+    expect(deletedCaches).toEqual([
+      'workbox-precache-v2',
+      'saathi-static-assets-v1',
+    ]);
+    delete (window as any).caches;
   });
 
   it('6. Full Offline-to-Online Production Flow (Real Express + SQLite + WebSocket): Load app -> go offline -> trigger SOS -> see honest queued state & SMS fallback -> go online -> confirm alert is delivered exactly once', async () => {
@@ -555,6 +586,7 @@ describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Co
 
     try {
       const agent = request.agent(baseUrl);
+      agent.set('Origin', baseUrl);
       const otpReq = await agent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000001' });
@@ -621,12 +653,14 @@ describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Co
         } as Response;
       }) as typeof fetch;
 
+      const openSockets: NodeWebSocket[] = [];
       globalThis.WebSocket = class AuthenticatedWs extends NodeWebSocket {
         constructor(url: string | URL) {
           const pathPart = String(url).replace(/^wss?:\/\/[^/]+/, '');
           super(`ws://127.0.0.1:${addr.port}${pathPart}`, {
             headers: { Cookie: cookieStr },
           });
+          openSockets.push(this);
         }
       } as unknown as typeof WebSocket;
 
@@ -685,15 +719,19 @@ describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Co
         fireEvent.keyDown(window, { key: 'Escape', shiftKey: true });
       });
 
-      const queuedNow = await listQueuedAlerts();
-      expect(queuedNow).toHaveLength(1);
+      await waitFor(async () => {
+        const queuedNow = await listQueuedAlerts();
+        expect(queuedNow).toHaveLength(1);
+      });
 
-      // Step 4: Verify honest queued status ("Not sent yet. Retrying. Tap to send by SMS"), SMS option, and 112/181 links
+      // Step 4: Verify honest queued status ("Saved on this phone. It will be sent when you open the app with a connection. If you can, send it by SMS now."), SMS option, and 112/181 links
       await waitFor(() => {
         expect(screen.getByTestId('sms-fallback-panel')).toBeTruthy();
         expect(
           screen.getByTestId('honest-queued-status-text').textContent
-        ).toContain('Not sent yet. Retrying. Tap to send by SMS');
+        ).toContain(
+          'Saved on this phone. It will be sent when you open the app with a connection. If you can, send it by SMS now.'
+        );
         expect(screen.queryByTestId('honest-sent-at-banner')).toBeNull();
       });
 
@@ -706,6 +744,17 @@ describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Co
       );
       expect(screen.getByTestId('offline-call-112-btn')).toBeTruthy();
       expect(screen.getByTestId('offline-call-181-btn')).toBeTruthy();
+
+      // Verify Hindi wording for queuedBannerText as well
+      await act(async () => {
+        await i18n.changeLanguage('hi');
+      });
+      expect(i18n.t('offline.queuedBannerText')).toContain(
+        'इस फ़ोन पर सहेजा गया। जब आप इंटरनेट कनेक्शन के साथ ऐप खोलेंगी, तब यह भेजा जाएगा। यदि संभव हो, तो इसे अभी SMS द्वारा भेजें।'
+      );
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
 
       // Verify server has 0 active incidents while offline
       const serverCheckWhileOffline = await agent.get('/api/incidents/active');
@@ -722,12 +771,29 @@ describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Co
         window.dispatchEvent(new Event('online'));
       });
 
-      await waitFor(async () => {
-        const remaining = await listQueuedAlerts();
-        expect(remaining).toHaveLength(0);
-        expect(screen.getByTestId('honest-sent-at-banner').textContent).toMatch(
-          /Sent at/i
-        );
+      await waitFor(
+        async () => {
+          const remaining = await listQueuedAlerts();
+          expect(remaining).toHaveLength(0);
+          expect(
+            screen.getByTestId('honest-sent-at-banner').textContent
+          ).toMatch(/Alert received by SHAKTI at/i);
+        },
+        { timeout: 5000 }
+      );
+
+      // Verify in TRIGGERED state that "Contacts notified" badge is NOT shown yet
+      expect(screen.queryByTestId('contacts-notified-badge')).toBeNull();
+
+      // Verify Hindi wording for "Alert received by SHAKTI at HH:MM"
+      await act(async () => {
+        await i18n.changeLanguage('hi');
+      });
+      expect(
+        i18n.t('offline.sentAtBannerText', { time: '10:30 AM' })
+      ).toContain('शक्ति (SHAKTI) द्वारा 10:30 AM पर अलर्ट प्राप्त किया गया');
+      await act(async () => {
+        await i18n.changeLanguage('en');
       });
 
       // Confirm the alert was delivered to the server exactly once
@@ -741,7 +807,6 @@ describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Co
       globalThis.WebSocket = originalWebSocket;
       clearAllScheduledTimers();
       wss.close();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
       await closeDatabase();
       for (const suffix of ['', '-wal', '-shm', '-journal']) {
         const candidate = `${tempDbPath}${suffix}`;
@@ -749,6 +814,7 @@ describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Co
           fs.unlinkSync(candidate);
         }
       }
+      server.close();
     }
-  });
+  }, 15000);
 });

@@ -67,6 +67,7 @@ describe('SAATHI Phase 3B API Tests (Notifications, Escalation, Realtime WebSock
 
   async function loginPhone(phone: string, name?: string) {
     const agent = request.agent(app);
+    agent.set('Origin', 'http://localhost:3000');
     const otpRes = await agent
       .post('/api/auth/otp/request')
       .send({ phone_e164: phone });
@@ -160,13 +161,19 @@ describe('SAATHI Phase 3B API Tests (Notifications, Escalation, Realtime WebSock
       .select()
       .from(notifications)
       .where(eq(notifications.incidentId, incidentId));
-    expect(notifRows).toHaveLength(2); // push + sms for Contact 1
-    expect(notifRows.every((n) => n.status === 'sent')).toBe(true);
-    expect(notifRows.every((n) => n.recipientRef === c1.id)).toBe(true);
+    const contactNotifRows = notifRows.filter(
+      (n) => n.recipientType === 'contact'
+    );
+    expect(contactNotifRows).toHaveLength(2); // push + sms for Contact 1
+    expect(contactNotifRows.every((n) => n.status === 'sent')).toBe(true);
+    expect(contactNotifRows.every((n) => n.recipientRef === c1.id)).toBe(true);
 
-    // Verify coordinates were included in the push message because location consent is true
-    expect(defaultPushProvider.sentPushes).toHaveLength(1);
-    expect(defaultPushProvider.sentPushes[0].body).toContain('28.61390');
+    // Verify coordinates were included in the contact push message because location consent is true
+    const contactPushes = defaultPushProvider.sentPushes.filter(
+      (p) => p.recipientRef === c1.id
+    );
+    expect(contactPushes).toHaveLength(1);
+    expect(contactPushes[0].body).toContain('28.61390');
 
     // Resolve the incident
     const resolveRes = await agent
@@ -257,14 +264,22 @@ describe('SAATHI Phase 3B API Tests (Notifications, Escalation, Realtime WebSock
       .from(notifications)
       .where(eq(notifications.incidentId, incidentId));
 
-    // Only cEligible was notified (push + sms),Invited Only was skipped
-    expect(notifRows).toHaveLength(2);
-    expect(notifRows.every((n) => n.recipientRef === cEligible.id)).toBe(true);
+    // Only cEligible was notified among contacts (push + sms), Invited Only was skipped
+    const contactNotifRows = notifRows.filter(
+      (n) => n.recipientType === 'contact'
+    );
+    expect(contactNotifRows).toHaveLength(2);
+    expect(
+      contactNotifRows.every((n) => n.recipientRef === cEligible.id)
+    ).toBe(true);
 
     // Verify alert was sent WITHOUT coordinates because location consent was not granted
-    expect(defaultPushProvider.sentPushes).toHaveLength(1);
-    expect(defaultPushProvider.sentPushes[0].body).not.toContain('19.076');
-    expect(defaultPushProvider.sentPushes[0].body).not.toContain('Location:');
+    const contactPushes = defaultPushProvider.sentPushes.filter(
+      (p) => p.recipientRef === cEligible.id
+    );
+    expect(contactPushes).toHaveLength(1);
+    expect(contactPushes[0].body).not.toContain('19.076');
+    expect(contactPushes[0].body).not.toContain('Location:');
 
     // Now revoke data_processing consent and trigger a second incident -> 0 notifications sent
     await agent
@@ -326,13 +341,16 @@ describe('SAATHI Phase 3B API Tests (Notifications, Escalation, Realtime WebSock
       step2DelayMs: 10000,
     });
 
-    // At t=0: ONLY Contact 1 is notified (2 rows: push + sms)
+    // At t=0: ONLY Contact 1 is notified among contacts (2 rows: push + sms)
     let notifRows = await db
       .select()
       .from(notifications)
       .where(eq(notifications.incidentId, incidentId));
-    expect(notifRows).toHaveLength(2);
-    expect(notifRows.every((n) => n.recipientRef === c1.id)).toBe(true);
+    const contactNotifsAtT0 = notifRows.filter(
+      (n) => n.recipientType === 'contact'
+    );
+    expect(contactNotifsAtT0).toHaveLength(2);
+    expect(contactNotifsAtT0.every((n) => n.recipientRef === c1.id)).toBe(true);
 
     // Simulate server restart while incident is NOTIFIED: clear all timers and call recoverPendingIncidentsOnStartup
     // with short test escalation timers (step1 = 150ms, step2 = 350ms)

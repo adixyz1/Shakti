@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { BigButton, Button, Card } from '../components/ui';
 import { PageLayout } from '../components/PageLayout';
@@ -113,6 +113,15 @@ export const OnboardingPage: React.FC = () => {
                   {t('onboarding.step3.consentCheckboxLabel')}
                 </span>
               </label>
+              <div className="pt-1">
+                <Link
+                  to="/policy"
+                  data-testid="onboarding-policy-link"
+                  className="text-xs font-semibold text-teal-800 dark:text-teal-300 underline underline-offset-4"
+                >
+                  {t('privacyTools.policyLinkBtn')}
+                </Link>
+              </div>
             </div>
           )}
 

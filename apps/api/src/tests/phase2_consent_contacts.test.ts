@@ -38,6 +38,7 @@ describe('SAATHI Phase 2 API Tests (Consents, Trusted Contacts, Invitations & Ru
 
   async function loginDemoUser() {
     const agent = request.agent(app);
+    agent.set('Origin', 'http://localhost:3000');
     const phone = '+919000000001';
     const otpRes = await agent
       .post('/api/auth/otp/request')

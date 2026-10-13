@@ -45,6 +45,7 @@ describe('SAATHI Phase 1 API Tests (Express + Drizzle + Real SQLite)', () => {
 
   it('completes OTP request -> verify -> /me -> PATCH /me against real SQLite', async () => {
     const agent = request.agent(app);
+    agent.set('Origin', 'http://localhost:3000');
     const phone = '+919000000001';
 
     const reqOtp = await agent
@@ -180,6 +181,7 @@ describe('SAATHI Phase 1 API Tests (Express + Drizzle + Real SQLite)', () => {
 
   it('rotates tokens via /api/auth/refresh and clears session on /api/auth/logout', async () => {
     const agent = request.agent(app);
+    agent.set('Origin', 'http://localhost:3000');
     const otp = await agent
       .post('/api/auth/otp/request')
       .send({ phone_e164: '+919000000001' });

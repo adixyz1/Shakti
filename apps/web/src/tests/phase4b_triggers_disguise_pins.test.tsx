@@ -290,7 +290,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
     });
   });
 
-  it('4. Voice code word trigger (experimental): disabled by default, requires explicit microphone consent step, and calls triggerSos("voice") when code word is spoken', async () => {
+  it('4. Voice code word trigger (experimental): has NO default codeword, requires explicit microphone consent + user-configured codeword (min 6 chars, confirm entry, salted PBKDF2 hash stored without plain text), and calls triggerSos("voice") when code word is spoken', async () => {
     const createIncidentSpy = vi
       .spyOn(apiModule.incidentsApi, 'createIncident')
       .mockImplementation(async (payload) => ({
@@ -319,9 +319,14 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
     }
     (window as any).SpeechRecognition = MockSpeechRecognition;
 
-    // Verify off by default and consent false by default
+    // Verify off by default, consent false by default, and NO default codeword hash
     expect(useTriggerSettingsStore.getState().voiceEnabled).toBe(false);
     expect(useTriggerSettingsStore.getState().voiceConsentGranted).toBe(false);
+    expect(useTriggerSettingsStore.getState().voiceCodewordHash).toBeNull();
+
+    // Attempting to enable voice trigger without a codeword hash is rejected by store
+    useTriggerSettingsStore.getState().setVoiceEnabled(true);
+    expect(useTriggerSettingsStore.getState().voiceEnabled).toBe(false);
 
     render(
       <MemoryRouter initialEntries={['/settings']}>
@@ -332,6 +337,20 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
         </Routes>
       </MemoryRouter>
     );
+
+    // Follow-up 2 check: Disguise-mode settings screen shows the home screen installation note in EN and HI
+    expect(screen.getByTestId('disguise-install-note').textContent).toContain(
+      'If you add the app to your home screen, give it a neutral name during installation. The installed name and icon cannot be changed afterwards.'
+    );
+    await act(async () => {
+      await i18n.changeLanguage('hi');
+    });
+    expect(screen.getByTestId('disguise-install-note').textContent).toContain(
+      'यदि आप ऐप को अपनी होम स्क्रीन पर जोड़ती हैं, तो इंस्टॉलेशन के दौरान इसे एक सामान्य (तटस्थ) नाम दें।'
+    );
+    await act(async () => {
+      await i18n.changeLanguage('en');
+    });
 
     // Clearly labeled experimental
     expect(screen.getByTestId('voice-experimental-label').textContent).toMatch(
@@ -350,19 +369,68 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
       source: 'settings_voice_trigger',
     });
 
-    // Enable experimental voice trigger
+    // Trying to toggle voice ON before setting a custom codeword prompts error
     const voiceToggle = await screen.findByTestId('toggle-voice');
+    fireEvent.click(voiceToggle);
+    expect(useTriggerSettingsStore.getState().voiceEnabled).toBe(false);
+    expect(screen.getByTestId('voice-codeword-error').textContent).toMatch(
+      /no default code word/i
+    );
+
+    // Reject codeword shorter than 6 characters
+    const wordInput = screen.getByTestId('voice-codeword-input');
+    const confirmInput = screen.getByTestId('voice-codeword-confirm-input');
+    const saveWordBtn = screen.getByTestId('save-voice-codeword-btn');
+
+    fireEvent.change(wordInput, { target: { value: 'short' } });
+    fireEvent.change(confirmInput, { target: { value: 'short' } });
+    fireEvent.click(saveWordBtn);
+    expect(screen.getByTestId('voice-codeword-error').textContent).toMatch(
+      /at least 6 characters/i
+    );
+
+    // Reject mismatched confirmation
+    fireEvent.change(wordInput, { target: { value: 'crimson lotus' } });
+    fireEvent.change(confirmInput, { target: { value: 'crimson river' } });
+    fireEvent.click(saveWordBtn);
+    expect(screen.getByTestId('voice-codeword-error').textContent).toMatch(
+      /does not match/i
+    );
+
+    // Valid custom codeword 'crimson lotus' (length 13 >= 6) with matching confirmation saves PBKDF2 hash and enables voice trigger
+    fireEvent.change(wordInput, { target: { value: 'crimson lotus' } });
+    fireEvent.change(confirmInput, { target: { value: 'crimson lotus' } });
     await act(async () => {
-      fireEvent.click(voiceToggle);
+      fireEvent.click(saveWordBtn);
     });
-    expect(useTriggerSettingsStore.getState().voiceEnabled).toBe(true);
+
+    await waitFor(() => {
+      expect(useTriggerSettingsStore.getState().voiceEnabled).toBe(true);
+    });
+
+    const storedVoiceHash =
+      useTriggerSettingsStore.getState().voiceCodewordHash;
+    expect(storedVoiceHash).toBeTruthy();
+    expect(storedVoiceHash).toMatch(
+      /^pbkdf2\$200000\$[0-9a-f]{32}\$[0-9a-f]{64}\$13$/
+    );
+
+    // Verify localStorage NEVER contains the plain codeword 'crimson lotus'
+    const rawStorage = window.localStorage.getItem(
+      'saathi_trigger_settings_v1'
+    );
+    expect(rawStorage).toBeTruthy();
+    expect(rawStorage).not.toContain('crimson lotus');
+    expect(rawStorage).not.toContain('saathi help');
+    expect(rawStorage).toContain(storedVoiceHash!);
+
     expect(activeRecognitionInstance).toBeTruthy();
 
-    // Simulate speech transcript matching "saathi help"
+    // Simulate speech transcript matching "crimson lotus"
     await act(async () => {
       activeRecognitionInstance.onresult({
         resultIndex: 0,
-        results: [[{ transcript: 'please saathi help right now' }]],
+        results: [[{ transcript: 'please crimson lotus right now' }]],
       });
     });
 
@@ -380,7 +448,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
   });
 
   it('5. Disguise mode: changes page title & icon, calculator actually calculates math, and secret sequence reveals the real SOS screen', async () => {
-    await useTriggerSettingsStore.getState().configureDisguiseSequence('112=');
+    await useTriggerSettingsStore.getState().configureDisguiseSequence('112181=');
     useTriggerSettingsStore.getState().setDisguiseEnabled(true);
 
     render(
@@ -420,16 +488,19 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
     fireEvent.click(screen.getByTestId('calc-key-C'));
     expect(screen.getByTestId('calc-display').textContent).toBe('0');
 
-    // 3. Enter secret unlock sequence: 1, 1, 2, = -> reveals real SOS screen and restores title
+    // 3. Enter secret unlock sequence: 1, 1, 2, 1, 8, 1, = -> reveals real SOS screen and restores title
     fireEvent.click(screen.getByTestId('calc-key-1'));
     fireEvent.click(screen.getByTestId('calc-key-1'));
     fireEvent.click(screen.getByTestId('calc-key-2'));
+    fireEvent.click(screen.getByTestId('calc-key-1'));
+    fireEvent.click(screen.getByTestId('calc-key-8'));
+    fireEvent.click(screen.getByTestId('calc-key-1'));
     fireEvent.click(screen.getByTestId('calc-key-='));
 
     await waitFor(() => {
       expect(screen.getByTestId('sos-hold-button')).toBeTruthy();
       expect(screen.queryByTestId('disguise-calculator')).toBeNull();
-      expect(document.title).toContain('SAATHI');
+      expect(document.title).toContain('SHAKTI');
     });
   });
 
@@ -543,6 +614,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
 
     try {
       const agent = request.agent(baseUrl);
+      agent.set('Origin', baseUrl);
       const otpReq = await agent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000001' });
@@ -557,6 +629,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
 
       // Responder login to verify real server state after duress cancel
       const responderAgent = request.agent(baseUrl);
+      responderAgent.set('Origin', baseUrl);
       const respOtp = await responderAgent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000002' });
@@ -611,9 +684,11 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
         }
       } as unknown as typeof WebSocket;
 
-      // Enable Disguise Mode with secret sequence '112=' (stored as salted SHA-256 hash)
+      // Enable Disguise Mode with secret sequence '112181=' (stored as PBKDF2 hash with 200,000 iterations)
       useTriggerSettingsStore.getState().resetTriggerSettings();
-      await useTriggerSettingsStore.getState().configureDisguiseSequence('112=');
+      await useTriggerSettingsStore
+        .getState()
+        .configureDisguiseSequence('112181=');
       useTriggerSettingsStore.getState().setDisguiseEnabled(true);
 
       render(
@@ -631,10 +706,13 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
         expect(screen.getByTestId('disguise-calculator')).toBeTruthy();
       });
 
-      // Unlock calculator with '112='
+      // Unlock calculator with '112181='
       fireEvent.click(screen.getByTestId('calc-key-1'));
       fireEvent.click(screen.getByTestId('calc-key-1'));
       fireEvent.click(screen.getByTestId('calc-key-2'));
+      fireEvent.click(screen.getByTestId('calc-key-1'));
+      fireEvent.click(screen.getByTestId('calc-key-8'));
+      fireEvent.click(screen.getByTestId('calc-key-1'));
       fireEvent.click(screen.getByTestId('calc-key-='));
 
       await waitFor(() => {
@@ -682,7 +760,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
       expect(activeCheckOwner.body.incident).toBeNull(); // Masked for owner
 
       const responderGet = await responderAgent.get(
-        `/api/incidents/${createdIncidentId}`
+        `/api/responder/incidents/${createdIncidentId}`
       );
       expect(responderGet.status).toBe(200);
       expect(responderGet.body.incident.status).toBe('ACTIVE');
@@ -712,7 +790,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
     }
   });
 
-  it('8. Fix 1: Disguise mode has NO default secret sequence, requires user to set & confirm her own sequence (min length 4), and stores only a salted SHA-256 hash on-device (never plain text in localStorage)', async () => {
+  it('8. Fix 1 & Fix D: Disguise mode has NO default secret sequence, requires user to set & confirm her own sequence (min length 6), and stores only a PBKDF2 hash (200,000 iterations + random salt) on-device (never plain text in localStorage)', async () => {
     useTriggerSettingsStore.getState().resetTriggerSettings();
 
     // 1. Verify NO default secret sequence exists
@@ -741,29 +819,29 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
       /no default sequence/i
     );
 
-    // 3. Reject sequence shorter than 4 characters
+    // 3. Reject sequence shorter than 6 characters
     const seqInput = screen.getByTestId('disguise-secret-input');
     const confirmInput = screen.getByTestId('disguise-secret-confirm-input');
     const saveBtn = screen.getByTestId('save-disguise-sequence-btn');
 
-    fireEvent.change(seqInput, { target: { value: '12=' } });
-    fireEvent.change(confirmInput, { target: { value: '12=' } });
+    fireEvent.change(seqInput, { target: { value: '2580=' } });
+    fireEvent.change(confirmInput, { target: { value: '2580=' } });
     fireEvent.click(saveBtn);
     expect(screen.getByTestId('disguise-sequence-error').textContent).toMatch(
-      /at least 4 characters/i
+      /at least 6 characters/i
     );
 
     // 4. Reject mismatched confirmation sequence
-    fireEvent.change(seqInput, { target: { value: '2580=' } });
-    fireEvent.change(confirmInput, { target: { value: '2589=' } });
+    fireEvent.change(seqInput, { target: { value: '258012=' } });
+    fireEvent.change(confirmInput, { target: { value: '258099=' } });
     fireEvent.click(saveBtn);
     expect(screen.getByTestId('disguise-sequence-error').textContent).toMatch(
       /does not match/i
     );
 
-    // 5. Valid custom sequence '2580=' with matching confirmation saves salted SHA-256 hash and enables disguise mode
-    fireEvent.change(seqInput, { target: { value: '2580=' } });
-    fireEvent.change(confirmInput, { target: { value: '2580=' } });
+    // 5. Valid custom sequence '258012=' (length 7 >= 6) with matching confirmation saves PBKDF2 (200000 iterations) hash and enables disguise mode
+    fireEvent.change(seqInput, { target: { value: '258012=' } });
+    fireEvent.change(confirmInput, { target: { value: '258012=' } });
     await act(async () => {
       fireEvent.click(saveBtn);
     });
@@ -774,14 +852,16 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
 
     const storedHash = useTriggerSettingsStore.getState().disguiseSequenceHash;
     expect(storedHash).toBeTruthy();
-    expect(storedHash).toMatch(/^sha256\$[0-9a-f]{32}\$[0-9a-f]+\$5$/);
+    expect(storedHash).toMatch(
+      /^pbkdf2\$200000\$[0-9a-f]{32}\$[0-9a-f]{64}\$7$/
+    );
 
-    // Verify localStorage NEVER contains the plain sequence '2580='
+    // Verify localStorage NEVER contains the plain sequence '258012='
     const rawStorage = window.localStorage.getItem(
       'saathi_trigger_settings_v1'
     );
     expect(rawStorage).toBeTruthy();
-    expect(rawStorage).not.toContain('2580=');
+    expect(rawStorage).not.toContain('258012=');
     expect(rawStorage).toContain(storedHash!);
   });
 
@@ -804,6 +884,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
 
     try {
       const ownerAgent = request.agent(baseUrl);
+      ownerAgent.set('Origin', baseUrl);
       const otp1 = await ownerAgent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000001' });
@@ -813,6 +894,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
       });
 
       const responderAgent = request.agent(baseUrl);
+      responderAgent.set('Origin', baseUrl);
       const otp2 = await responderAgent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000002' });
@@ -855,7 +937,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
 
       // Verify on server via responder that the real duress incident was NOT closed!
       const responderCheck = await responderAgent.get(
-        `/api/incidents/${incidentId}`
+        `/api/responder/incidents/${incidentId}`
       );
       expect(responderCheck.status).toBe(200);
       expect(responderCheck.body.incident.status).toBe('ACTIVE');
@@ -864,7 +946,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
 
       // Now responder resolves the incident -> real incident is closed
       const responderResolve = await responderAgent
-        .post(`/api/incidents/${incidentId}/resolve`)
+        .post(`/api/responder/incidents/${incidentId}/resolve`)
         .send({ resolution: 'RESOLVED', note: 'Verified safe by responder' });
       expect(responderResolve.status).toBe(200);
       expect(responderResolve.body.incident.status).toBe('RESOLVED');
@@ -902,6 +984,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
 
     try {
       const ownerAgent = request.agent(baseUrl);
+      ownerAgent.set('Origin', baseUrl);
       const otp1 = await ownerAgent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000001' });
@@ -911,6 +994,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
       });
 
       const responderAgent = request.agent(baseUrl);
+      responderAgent.set('Origin', baseUrl);
       const otp2 = await responderAgent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000002' });
@@ -962,7 +1046,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
 
       // Verify real duress incident is STILL ACTIVE on the server!
       const checkAfterShadowCancel = await responderAgent.get(
-        `/api/incidents/${realIncidentId}`
+        `/api/responder/incidents/${realIncidentId}`
       );
       expect(checkAfterShadowCancel.body.incident.status).toBe('ACTIVE');
       expect(checkAfterShadowCancel.body.incident.is_duress).toBe(true);
@@ -990,7 +1074,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
 
       // Verify real duress incident is STILL ACTIVE and untouched on the server!
       const checkAfterShadowResolve = await responderAgent.get(
-        `/api/incidents/${realIncidentId}`
+        `/api/responder/incidents/${realIncidentId}`
       );
       expect(checkAfterShadowResolve.body.incident.status).toBe('ACTIVE');
       expect(checkAfterShadowResolve.body.incident.is_duress).toBe(true);

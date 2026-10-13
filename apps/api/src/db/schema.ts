@@ -88,6 +88,8 @@ export const NOTIFICATION_STATUSES = [
 ] as const;
 export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number];
 
+export const DEFAULT_ORGANIZATION_ZONE = 'Demo Campus Zone';
+
 export const users = sqliteTable(
   'users',
   {
@@ -102,6 +104,9 @@ export const users = sqliteTable(
       .$type<SupportedLanguage>()
       .notNull()
       .default('en'),
+    organizationZone: text('organization_zone')
+      .notNull()
+      .default(DEFAULT_ORGANIZATION_ZONE),
     cancelWindowSeconds: integer('cancel_window_seconds').notNull().default(5),
     cancelPinHash: text('cancel_pin_hash'),
     duressPinHash: text('duress_pin_hash'),
@@ -197,6 +202,10 @@ export const incidents = sqliteTable(
       .notNull(),
     emergencyType: text('emergency_type'),
     clientRequestId: text('client_request_id').notNull(),
+    clientCreatedAt: text('client_created_at'),
+    queuedOffline: integer('queued_offline', { mode: 'boolean' })
+      .notNull()
+      .default(false),
     createdAt: text('created_at').notNull(),
     activatedAt: text('activated_at'),
     closedAt: text('closed_at'),
@@ -208,6 +217,7 @@ export const incidents = sqliteTable(
       .notNull()
       .default(false),
     escalationStage: integer('escalation_stage').notNull().default(0),
+    isDemo: integer('is_demo', { mode: 'boolean' }).notNull().default(false),
   },
   (table) => [
     index('idx_incidents_user_id').on(table.userId),
@@ -278,6 +288,119 @@ export const locationSamples = sqliteTable(
   (table) => [index('idx_location_samples_incident_id').on(table.incidentId)]
 );
 
+export const contactIncidentTokens = sqliteTable(
+  'contact_incident_tokens',
+  {
+    id: text('id').primaryKey(),
+    incidentId: text('incident_id').notNull(),
+    contactId: text('contact_id').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('idx_contact_incident_tokens_hash').on(table.tokenHash),
+    uniqueIndex('idx_contact_incident_tokens_pair').on(
+      table.incidentId,
+      table.contactId
+    ),
+    index('idx_contact_incident_tokens_incident_id').on(table.incidentId),
+  ]
+);
+
+export const responders = sqliteTable(
+  'responders',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    organizationZone: text('organization_zone')
+      .notNull()
+      .default(DEFAULT_ORGANIZATION_ZONE),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    onDuty: integer('on_duty', { mode: 'boolean' }).notNull().default(true),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('idx_responders_user_id').on(table.userId),
+    index('idx_responders_org_zone').on(table.organizationZone),
+  ]
+);
+
+export const incidentAssignments = sqliteTable(
+  'incident_assignments',
+  {
+    id: text('id').primaryKey(),
+    incidentId: text('incident_id').notNull(),
+    responderId: text('responder_id').notNull(),
+    responderUserId: text('responder_user_id').notNull(),
+    organizationZone: text('organization_zone').notNull(),
+    assignedByUserId: text('assigned_by_user_id'),
+    acknowledgedAt: text('acknowledged_at'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('idx_incident_assignments_pair').on(
+      table.incidentId,
+      table.responderId
+    ),
+    index('idx_incident_assignments_incident_id').on(table.incidentId),
+    index('idx_incident_assignments_org_zone').on(table.organizationZone),
+  ]
+);
+
+export const incidentAccessAudit = sqliteTable(
+  'incident_access_audit',
+  {
+    id: text('id').primaryKey(),
+    incidentId: text('incident_id').notNull(),
+    actorType: text('actor_type', { enum: ['contact', 'responder', 'admin'] })
+      .$type<'contact' | 'responder' | 'admin'>()
+      .notNull(),
+    actorId: text('actor_id').notNull(),
+    actorLabel: text('actor_label'),
+    action: text('action').notNull(),
+    detail: text('detail'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    index('idx_incident_access_audit_incident_id').on(table.incidentId),
+    index('idx_incident_access_audit_created_at').on(table.createdAt),
+  ]
+);
+
+export const auditLog = incidentAccessAudit;
+
+export const JOURNEY_STATUSES = [
+  'active',
+  'completed',
+  'lapsed',
+  'cancelled',
+] as const;
+export type JourneyStatus = (typeof JOURNEY_STATUSES)[number];
+
+export const journeys = sqliteTable(
+  'journeys',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    contactId: text('contact_id'),
+    note: text('note'),
+    startedAt: text('started_at').notNull(),
+    endsAt: text('ends_at').notNull(),
+    status: text('status', { enum: JOURNEY_STATUSES })
+      .$type<JourneyStatus>()
+      .notNull()
+      .default('active'),
+    reminderSentAt: text('reminder_sent_at'),
+    lapsedNotifiedAt: text('lapsed_notified_at'),
+  },
+  (table) => [
+    index('idx_journeys_user_id').on(table.userId),
+    index('idx_journeys_status').on(table.status),
+  ]
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type NewUserRow = typeof users.$inferInsert;
 export type OtpCodeRow = typeof otpCodes.$inferSelect;
@@ -298,3 +421,116 @@ export type LocationSampleRow = typeof locationSamples.$inferSelect;
 export type NewLocationSampleRow = typeof locationSamples.$inferInsert;
 export type NotificationRow = typeof notifications.$inferSelect;
 export type NewNotificationRow = typeof notifications.$inferInsert;
+export type ContactIncidentTokenRow =
+  typeof contactIncidentTokens.$inferSelect;
+export type NewContactIncidentTokenRow =
+  typeof contactIncidentTokens.$inferInsert;
+export type ResponderRow = typeof responders.$inferSelect;
+export type NewResponderRow = typeof responders.$inferInsert;
+export type IncidentAssignmentRow = typeof incidentAssignments.$inferSelect;
+export type NewIncidentAssignmentRow = typeof incidentAssignments.$inferInsert;
+export type IncidentAccessAuditRow = typeof incidentAccessAudit.$inferSelect;
+export type NewIncidentAccessAuditRow = typeof incidentAccessAudit.$inferInsert;
+export type JourneyRow = typeof journeys.$inferSelect;
+export type NewJourneyRow = typeof journeys.$inferInsert;
+
+export const REPORT_CATEGORIES = [
+  'poor_lighting',
+  'harassment',
+  'stalking',
+  'unsafe_area',
+  'broken_cctv',
+  'other',
+] as const;
+export type ReportCategory = (typeof REPORT_CATEGORIES)[number];
+
+export const reports = sqliteTable(
+  'reports',
+  {
+    id: text('id').primaryKey(),
+    category: text('category', { enum: REPORT_CATEGORIES })
+      .$type<ReportCategory>()
+      .notNull(),
+    lat: real('lat').notNull(),
+    lng: real('lng').notNull(),
+    note: text('note'),
+    anonymous: integer('anonymous', { mode: 'boolean' })
+      .notNull()
+      .default(true),
+    userId: text('user_id'),
+    createdAt: text('created_at').notNull(),
+    isDemo: integer('is_demo', { mode: 'boolean' }).notNull().default(false),
+  },
+  (table) => [
+    index('idx_reports_grid_coords').on(table.lat, table.lng),
+    index('idx_reports_created_at').on(table.createdAt),
+  ]
+);
+
+export type ReportRow = typeof reports.$inferSelect;
+export type NewReportRow = typeof reports.$inferInsert;
+
+export const RESOURCE_CATEGORIES = [
+  'emergency_helpline',
+  'women_helpline',
+  'one_stop_centre',
+  'campus_security',
+  'legal_aid',
+  'counseling',
+] as const;
+export type ResourceCategory = (typeof RESOURCE_CATEGORIES)[number];
+
+export const resources = sqliteTable(
+  'resources',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    category: text('category').notNull(),
+    phone: text('phone').notNull(),
+    description: text('description').notNull(),
+    availableHours: text('available_hours').notNull(),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+  },
+  (table) => [
+    index('idx_resources_category').on(table.category),
+    index('idx_resources_active').on(table.active),
+  ]
+);
+
+export const safetyPulses = sqliteTable(
+  'safety_pulses',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id'),
+    safetyScore: integer('safety_score').notNull(),
+    avoidedGoingSomewhere: integer('avoided_going_somewhere', {
+      mode: 'boolean',
+    }).notNull(),
+    createdAt: text('created_at').notNull(),
+    isDemo: integer('is_demo', { mode: 'boolean' }).notNull().default(false),
+  },
+  (table) => [
+    index('idx_safety_pulses_user_id').on(table.userId),
+    index('idx_safety_pulses_created_at').on(table.createdAt),
+  ]
+);
+
+export type ResourceRow = typeof resources.$inferSelect;
+export type NewResourceRow = typeof resources.$inferInsert;
+export type SafetyPulseRow = typeof safetyPulses.$inferSelect;
+export type NewSafetyPulseRow = typeof safetyPulses.$inferInsert;
+
+export const postIncidentRatings = sqliteTable(
+  'post_incident_ratings',
+  {
+    incidentId: text('incident_id').primaryKey(),
+    score: integer('score').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [index('idx_post_incident_ratings_created_at').on(table.createdAt)]
+);
+
+export type PostIncidentRatingRow = typeof postIncidentRatings.$inferSelect;
+export type NewPostIncidentRatingRow = typeof postIncidentRatings.$inferInsert;
+
+

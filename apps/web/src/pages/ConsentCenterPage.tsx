@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { BigButton, Button, Card, Spinner } from '../components/ui';
 import { PageLayout } from '../components/PageLayout';
@@ -172,6 +173,15 @@ export const ConsentCenterPage: React.FC = () => {
           <p className="text-sm md:text-base text-slate-600 dark:text-slate-300 max-w-3xl leading-relaxed">
             {t('consents.subtitle')}
           </p>
+          <div className="pt-1">
+            <Link
+              to="/policy"
+              data-testid="consents-policy-link"
+              className="text-sm font-semibold text-teal-800 dark:text-teal-300 underline underline-offset-4"
+            >
+              {t('privacyTools.policyLinkBtn')}
+            </Link>
+          </div>
         </header>
 
         {isLoading ? (

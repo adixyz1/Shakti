@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
@@ -7,11 +7,14 @@ import {
   Calculator,
   CheckCircle2,
   Delete,
+  Download,
   KeyRound,
   Keyboard,
   Mic,
+  ShieldCheck,
   Smartphone,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import { BigButton, Button, Card, Input } from '../components/ui';
 import { LanguageToggle } from '../components/LanguageToggle';
@@ -19,6 +22,7 @@ import { PageLayout } from '../components/PageLayout';
 import { useAuthStore } from '../store/authStore';
 import { useTriggerSettingsStore } from '../store/triggerSettingsStore';
 import { authApi, consentsApi, settingsApi } from '../lib/api';
+import { clearUserLocalDataOnLogout } from '../lib/offlineQueue';
 import {
   setPracticeModeTarget,
   subscribePracticeTrigger,
@@ -45,7 +49,7 @@ export const SettingsPage: React.FC = () => {
     shakeThreshold,
     shakePermissionState,
     voiceEnabled,
-    voiceCodeword,
+    voiceCodewordHash,
     voiceConsentGranted,
     disguiseEnabled,
     disguiseSequenceHash,
@@ -58,7 +62,7 @@ export const SettingsPage: React.FC = () => {
     setShakeThreshold,
     setShakePermissionState,
     setVoiceEnabled,
-    setVoiceCodeword,
+    configureVoiceCodeword,
     setVoiceConsentGranted,
     setDisguiseEnabled,
     configureDisguiseSequence,
@@ -85,12 +89,18 @@ export const SettingsPage: React.FC = () => {
     string | null
   >(null);
 
-  // Fix 1: Disguise sequence setup (NO default sequence; requires min length 4 + confirm entry; stored as salted SHA-256 hash)
+  // Fix 1: Disguise sequence setup (NO default sequence; requires min length 6 + confirm entry; stored as salted PBKDF2-SHA256 hash)
   const [showDisguiseSetup, setShowDisguiseSetup] = useState(false);
   const [disguiseSeqInput, setDisguiseSeqInput] = useState<string>('');
   const [disguiseSeqConfirm, setDisguiseSeqConfirm] = useState<string>('');
   const [disguiseError, setDisguiseError] = useState<string | null>(null);
   const [showPracticeDisguise, setShowPracticeDisguise] = useState(false);
+
+  // Follow-up 1: Voice codeword setup (NO default codeword; requires min length 6 + confirm entry; stored as salted PBKDF2-SHA256 hash)
+  const [showVoiceSetup, setShowVoiceSetup] = useState(false);
+  const [voiceWordInput, setVoiceWordInput] = useState<string>('');
+  const [voiceWordConfirm, setVoiceWordConfirm] = useState<string>('');
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
   // Battery API low-power suggestion
   const [lowBatteryDetected, setLowBatteryDetected] = useState<number | null>(
@@ -102,6 +112,16 @@ export const SettingsPage: React.FC = () => {
   const [practiceSuccessSource, setPracticeSuccessSource] = useState<
     string | null
   >(null);
+
+  // Phase 8C: Privacy Tools State (Export, Clear Local Data, Delete Account)
+  const [isExportingData, setIsExportingData] = useState(false);
+  const [isClearingLocal, setIsClearingLocal] = useState(false);
+  const [showDeleteAccountForm, setShowDeleteAccountForm] = useState(false);
+  const [deleteOtpDevCode, setDeleteOtpDevCode] = useState<string | null>(null);
+  const [deleteOtpInput, setDeleteOtpInput] = useState('');
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   useEffect(() => {
     if (user?.cancel_window_seconds !== undefined) {
@@ -335,7 +355,7 @@ export const SettingsPage: React.FC = () => {
     const seq1 = disguiseSeqInput.trim();
     const seq2 = disguiseSeqConfirm.trim();
 
-    if (seq1.length < 4) {
+    if (seq1.length < 6) {
       setDisguiseError(t('settings.disguise.errorMinLength'));
       return;
     }
@@ -353,6 +373,27 @@ export const SettingsPage: React.FC = () => {
     setDisguiseSeqConfirm('');
     setShowDisguiseSetup(false);
     addToast(t('settings.disguise.savedSequenceToast'), 'success');
+  };
+
+  const handleSaveVoiceCodeword = async () => {
+    setVoiceError(null);
+    const word1 = voiceWordInput.trim();
+    const word2 = voiceWordConfirm.trim();
+
+    if (word1.length < 6) {
+      setVoiceError(t('settings.triggers.voiceErrorMinLength'));
+      return;
+    }
+    if (word1.toLowerCase() !== word2.toLowerCase()) {
+      setVoiceError(t('settings.triggers.voiceErrorMismatch'));
+      return;
+    }
+
+    await configureVoiceCodeword(word1);
+    setVoiceWordInput('');
+    setVoiceWordConfirm('');
+    setShowVoiceSetup(false);
+    addToast(t('settings.triggers.voiceSavedToast'), 'success');
   };
 
   const handleRequestIosShakePermission = async () => {
@@ -402,6 +443,92 @@ export const SettingsPage: React.FC = () => {
       setPracticeSuccessSource(null);
       setPracticeTrigger(triggerName);
       setPracticeModeTarget(triggerName);
+    }
+  };
+
+  const handleDownloadMyData = async () => {
+    setIsExportingData(true);
+    try {
+      const exportData = await authApi.exportMyData();
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `saathi-my-data-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addToast(t('privacyTools.exportSuccessToast'), 'success');
+    } catch (err) {
+      addToast(
+        err instanceof Error ? err.message : 'Failed to export data',
+        'error'
+      );
+    } finally {
+      setIsExportingData(false);
+    }
+  };
+
+  const handleClearLocalData = async () => {
+    setIsClearingLocal(true);
+    try {
+      await clearUserLocalDataOnLogout();
+      addToast(t('privacyTools.clearLocalSuccessToast'), 'success');
+    } catch {
+      addToast(t('privacyTools.clearLocalSuccessToast'), 'info');
+    } finally {
+      setIsClearingLocal(false);
+    }
+  };
+
+  const handleRequestDeleteOtp = async () => {
+    if (!user?.phone_e164) return;
+    setDeleteError(null);
+    try {
+      const res = await authApi.requestOtp(user.phone_e164);
+      if (res.dev_mock_hint) {
+        setDeleteOtpDevCode(res.dev_mock_hint);
+      } else if ((res as { dev_otp?: string }).dev_otp) {
+        setDeleteOtpDevCode((res as { dev_otp?: string }).dev_otp || null);
+      }
+      addToast(t('privacyTools.sendOtpBtn'), 'info');
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : 'Failed to send OTP'
+      );
+    }
+  };
+
+  const handleConfirmDeleteAccount = async () => {
+    setDeleteError(null);
+    if (deleteConfirmInput.trim() !== 'DELETE') {
+      setDeleteError(t('privacyTools.deleteErrorConfirmWord'));
+      return;
+    }
+    if (!deleteOtpInput.trim()) {
+      setDeleteError(t('privacyTools.deleteErrorReauth'));
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      await authApi.deleteMyAccount({
+        confirmation: 'DELETE',
+        otp_code: deleteOtpInput.trim(),
+      });
+      await clearUserLocalDataOnLogout();
+      setUser(null);
+      addToast(t('privacyTools.deletedSuccessToast'), 'info');
+      navigate('/login');
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : 'Failed to delete account'
+      );
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -787,6 +914,12 @@ export const SettingsPage: React.FC = () => {
               </div>
               <p className="text-sm text-slate-600 dark:text-slate-300">
                 {t('settings.disguise.sectionBody')}
+              </p>
+              <p
+                data-testid="disguise-install-note"
+                className="text-xs font-medium text-amber-800 dark:text-amber-300 pt-1"
+              >
+                {t('settings.disguise.installNote')}
               </p>
             </div>
             <span
@@ -1205,17 +1338,81 @@ export const SettingsPage: React.FC = () => {
                     type="checkbox"
                     data-testid="toggle-voice"
                     checked={voiceEnabled}
-                    onChange={(e) => setVoiceEnabled(e.target.checked)}
+                    onChange={(e) => {
+                      if (e.target.checked && !voiceCodewordHash) {
+                        setShowVoiceSetup(true);
+                        setVoiceError(
+                          t('settings.triggers.voiceRequireCustomCodeword')
+                        );
+                        return;
+                      }
+                      setVoiceEnabled(e.target.checked);
+                    }}
                     className="w-6 h-6 accent-teal-700"
                   />
                 </label>
 
-                <Input
-                  label={t('settings.triggers.voiceCodewordLabel')}
-                  data-testid="voice-codeword-input"
-                  value={voiceCodeword}
-                  onChange={(e) => setVoiceCodeword(e.target.value)}
-                />
+                {showVoiceSetup || !voiceCodewordHash ? (
+                  <div
+                    data-testid="voice-codeword-setup"
+                    className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3"
+                  >
+                    <Input
+                      label={t('settings.triggers.voiceCodewordLabel')}
+                      data-testid="voice-codeword-input"
+                      type="password"
+                      placeholder="Min 6 characters"
+                      value={voiceWordInput}
+                      onChange={(e) => {
+                        setVoiceWordInput(e.target.value);
+                        setVoiceError(null);
+                      }}
+                    />
+                    <Input
+                      label={t('settings.triggers.voiceConfirmCodewordLabel')}
+                      data-testid="voice-codeword-confirm-input"
+                      type="password"
+                      placeholder="Re-enter code word"
+                      value={voiceWordConfirm}
+                      onChange={(e) => {
+                        setVoiceWordConfirm(e.target.value);
+                        setVoiceError(null);
+                      }}
+                    />
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {t('settings.triggers.voiceCodewordHint')}
+                    </p>
+                    {voiceError && (
+                      <p
+                        role="alert"
+                        data-testid="voice-codeword-error"
+                        className="text-sm font-semibold text-rose-700 dark:text-rose-400"
+                      >
+                        {voiceError}
+                      </p>
+                    )}
+                    <BigButton
+                      type="button"
+                      variant="secondary"
+                      data-testid="save-voice-codeword-btn"
+                      onClick={() => void handleSaveVoiceCodeword()}
+                    >
+                      {t('settings.triggers.voiceSaveCodewordBtn')}
+                    </BigButton>
+                  </div>
+                ) : (
+                  <BigButton
+                    type="button"
+                    variant="secondary"
+                    data-testid="change-voice-codeword-btn"
+                    onClick={() => {
+                      setShowVoiceSetup(true);
+                      setVoiceError(null);
+                    }}
+                  >
+                    {t('settings.triggers.voiceChangeCodewordBtn')}
+                  </BigButton>
+                )}
 
                 <BigButton
                   type="button"
@@ -1319,6 +1516,198 @@ export const SettingsPage: React.FC = () => {
               </Button>
             </Card>
           </div>
+        </section>
+
+        {/* Phase 8C Task 4 & 5: Privacy Tools & Emergency Data Policy */}
+        <section
+          className="space-y-4 pt-2 border-t border-slate-200 dark:border-slate-800"
+          data-testid="privacy-tools-section"
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-teal-700 dark:text-teal-400" />
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                {t('privacyTools.sectionTitle')}
+              </h2>
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              {t('privacyTools.sectionSubtitle')}
+            </p>
+            <div className="pt-1">
+              <Link
+                to="/policy"
+                data-testid="settings-policy-link"
+                className="text-sm font-semibold text-teal-700 dark:text-teal-400 underline hover:text-teal-800"
+              >
+                {t('privacyTools.policyLinkBtn')}
+              </Link>
+            </div>
+          </div>
+
+          {/* 1. Download my data */}
+          <Card className="space-y-3" data-testid="download-data-card">
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                {t('privacyTools.exportTitle')}
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                {t('privacyTools.exportBody')}
+              </p>
+            </div>
+            <BigButton
+              type="button"
+              variant="secondary"
+              data-testid="download-my-data-btn"
+              isLoading={isExportingData}
+              onClick={() => void handleDownloadMyData()}
+            >
+              <Download className="w-5 h-5 mr-2" />
+              {t('privacyTools.exportBtn')}
+            </BigButton>
+          </Card>
+
+          {/* 2. Clear local data on this device */}
+          <Card className="space-y-3" data-testid="clear-local-data-card">
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                {t('privacyTools.clearLocalTitle')}
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                {t('privacyTools.clearLocalBody')}
+              </p>
+            </div>
+            <BigButton
+              type="button"
+              variant="outline"
+              data-testid="clear-local-data-btn"
+              isLoading={isClearingLocal}
+              onClick={() => void handleClearLocalData()}
+            >
+              <Trash2 className="w-5 h-5 mr-2" />
+              {t('privacyTools.clearLocalBtn')}
+            </BigButton>
+          </Card>
+
+          {/* 3. Delete my account */}
+          <Card
+            className="space-y-4 border-rose-200 dark:border-rose-900/60"
+            data-testid="delete-account-card"
+          >
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-rose-800 dark:text-rose-300">
+                {t('privacyTools.deleteAccountTitle')}
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                {t('privacyTools.deleteAccountBody')}
+              </p>
+            </div>
+
+            {!showDeleteAccountForm ? (
+              <BigButton
+                type="button"
+                variant="danger"
+                data-testid="open-delete-account-btn"
+                onClick={() => {
+                  setShowDeleteAccountForm(true);
+                  setDeleteError(null);
+                }}
+              >
+                {t('privacyTools.deleteOpenBtn')}
+              </BigButton>
+            ) : (
+              <div
+                data-testid="delete-account-confirm-box"
+                className="rounded-2xl border-2 border-rose-500 bg-rose-50/70 dark:bg-rose-950/40 p-4 space-y-4"
+              >
+                <p className="text-sm font-semibold text-rose-950 dark:text-rose-100">
+                  {t('privacyTools.deleteAccountTitle')}
+                </p>
+
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      {t('privacyTools.reauthOtpLabel')}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      data-testid="delete-request-otp-btn"
+                      onClick={() => void handleRequestDeleteOtp()}
+                    >
+                      {t('privacyTools.sendOtpBtn')}
+                    </Button>
+                  </div>
+                  <Input
+                    label={t('privacyTools.reauthOtpLabel')}
+                    data-testid="delete-account-otp-input"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="6-digit OTP"
+                    value={deleteOtpInput}
+                    onChange={(e) => {
+                      setDeleteOtpInput(e.target.value);
+                      setDeleteError(null);
+                    }}
+                  />
+                  {deleteOtpDevCode && (
+                    <p
+                      data-testid="delete-dev-otp-hint"
+                      className="text-xs font-mono text-slate-600 dark:text-slate-400"
+                    >
+                      {t('privacyTools.otpSentHint', { code: deleteOtpDevCode })}
+                    </p>
+                  )}
+                </div>
+
+                <Input
+                  label={t('privacyTools.typeDeleteLabel')}
+                  data-testid="delete-account-word-input"
+                  type="text"
+                  placeholder="DELETE"
+                  value={deleteConfirmInput}
+                  onChange={(e) => {
+                    setDeleteConfirmInput(e.target.value);
+                    setDeleteError(null);
+                  }}
+                />
+
+                {deleteError && (
+                  <p
+                    role="alert"
+                    data-testid="delete-account-error"
+                    className="text-sm font-semibold text-rose-700 dark:text-rose-300"
+                  >
+                    {deleteError}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <BigButton
+                    type="button"
+                    variant="danger"
+                    data-testid="confirm-delete-account-btn"
+                    isLoading={isDeletingAccount}
+                    onClick={() => void handleConfirmDeleteAccount()}
+                  >
+                    {t('privacyTools.confirmDeleteBtn')}
+                  </BigButton>
+                  <BigButton
+                    type="button"
+                    variant="outline"
+                    data-testid="cancel-delete-account-btn"
+                    onClick={() => {
+                      setShowDeleteAccountForm(false);
+                      setDeleteError(null);
+                      setDeleteOtpInput('');
+                      setDeleteConfirmInput('');
+                    }}
+                  >
+                    {t('privacyTools.deleteCancelBtn')}
+                  </BigButton>
+                </div>
+              </div>
+            )}
+          </Card>
         </section>
       </div>
     </PageLayout>

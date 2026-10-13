@@ -52,6 +52,7 @@ describe('SAATHI Phase 3A API Tests (SOS Engine Core, State Machine, Duress, Sch
 
   async function loginDemoUser() {
     const agent = request.agent(app);
+    agent.set('Origin', 'http://localhost:3000');
     const phone = '+919000000001';
     const otpRes = await agent
       .post('/api/auth/otp/request')
@@ -71,6 +72,7 @@ describe('SAATHI Phase 3A API Tests (SOS Engine Core, State Machine, Duress, Sch
 
   async function loginResponder() {
     const agent = request.agent(app);
+    agent.set('Origin', 'http://localhost:3000');
     const phone = '+919000000002';
     const otpRes = await agent
       .post('/api/auth/otp/request')

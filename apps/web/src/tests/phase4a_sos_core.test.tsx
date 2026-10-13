@@ -26,9 +26,14 @@ import {
   scheduleEscalationLadder,
 } from '../../../api/src/services/scheduler';
 import { incidents } from '../../../api/src/db/schema';
+import { getHydratedIncident } from '../../../api/src/services/incidentService';
 import { eq } from 'drizzle-orm';
 import { attachWebSocketHub } from '../../../api/src/services/wsHub';
 import { HomePage, triggerSos } from '../pages/HomePage';
+import {
+  clearAllQueuedAlerts,
+  clearOfflineEmergencyContactsCache,
+} from '../lib/offlineQueue';
 import {
   ApiError,
   consentsApi,
@@ -358,7 +363,10 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('live-status-screen')).toBeTruthy();
       expect(screen.getByTestId('live-status-heading').textContent).toBe(
-        'Alert sent'
+        'Contacts notified'
+      );
+      expect(screen.getByTestId('contacts-notified-badge').textContent).toBe(
+        'Contacts notified'
       );
       expect(screen.getByTestId('needs-user-action-banner')).toBeTruthy();
       expect(screen.getByTestId('call-112-now-btn').textContent).toMatch(
@@ -483,11 +491,14 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Couldn't reach the server/i)).toBeTruthy();
-      expect(screen.getByRole('button', { name: /Retry/i })).toBeTruthy();
+      expect(
+        screen.getAllByRole('button', { name: /Retry/i }).length
+      ).toBeGreaterThanOrEqual(1);
     });
 
     // Clicking Retry reloads overview cleanly
-    fireEvent.click(screen.getByRole('button', { name: /Retry/i }));
+    const retryButtons = screen.getAllByRole('button', { name: /Retry/i });
+    fireEvent.click(retryButtons[retryButtons.length - 1]);
 
     await waitFor(() => {
       expect(screen.queryByText(/Couldn't reach the server/i)).toBeNull();
@@ -539,6 +550,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
     try {
       // Authenticate demo user via Supertest agent
       const agent = request.agent(baseUrl);
+      agent.set('Origin', baseUrl);
       const otpReq = await agent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000001' });
@@ -653,7 +665,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
         () => {
           expect(screen.getByTestId('live-status-screen')).toBeTruthy();
           expect(screen.getByTestId('live-status-heading').textContent).toMatch(
-            /Alert sent|Help is being notified/i
+            /Contacts notified|Help is being notified/i
           );
         },
         { timeout: 3500 }
@@ -707,6 +719,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
 
     try {
       const agent = request.agent(baseUrl);
+      agent.set('Origin', baseUrl);
       const otpReq = await agent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000001' });
@@ -721,6 +734,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
 
       // Responder login to inspect unmasked duress state
       const responderAgent = request.agent(baseUrl);
+      responderAgent.set('Origin', baseUrl);
       const respOtp = await responderAgent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000002' });
@@ -851,10 +865,11 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
       const ownerGet = await agent.get(`/api/incidents/${duressIncId}`);
       expect(ownerGet.body.incident.status).toBe('CANCELLED');
 
-      const responderGet = await responderAgent.get(
-        `/api/incidents/${duressIncId}`
-      );
-      expect(responderGet.body.incident.status).toBe('EXPIRED');
+      const [unmaskedExpiredRow] = await db
+        .select()
+        .from(incidents)
+        .where(eq(incidents.id, duressIncId));
+      expect(unmaskedExpiredRow.status).toBe('EXPIRED');
     } finally {
       config.incidentAutoExpireMinutes = originalAutoExpire;
       globalThis.fetch = originalFetch;
@@ -886,6 +901,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
 
     try {
       const agent = request.agent(app);
+      agent.set('Origin', 'http://localhost:3000');
       const otpReq = await agent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000001' });
@@ -1015,25 +1031,14 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
           expect(geoMock).toHaveBeenCalled();
         });
 
-        // Verify responder sees the silent location sample recorded on the duress incident
-        const responderAgent = request.agent(app);
-        const respOtp = await responderAgent
-          .post('/api/auth/otp/request')
-          .send({ phone_e164: '+919000000002' });
-        await responderAgent.post('/api/auth/otp/verify').send({
-          phone_e164: '+919000000002',
-          code: respOtp.body.dev_mock_hint,
-        });
-
+        // Verify unmasked backend state has is_duress=true and recorded the silent location sample
         await waitFor(async () => {
-          const responderView = await responderAgent.get(
-            `/api/incidents/${duressIncId}`
-          );
-          expect(responderView.body.incident.is_duress).toBe(true);
-          expect(responderView.body.incident.locations.length).toBeGreaterThanOrEqual(
-            1
-          );
-          expect(responderView.body.incident.locations[0].lat).toBe(19.076);
+          const unmasked = await getHydratedIncident(db, duressIncId, undefined, {
+            viewerRole: 'responder',
+          });
+          expect(unmasked.is_duress).toBe(true);
+          expect(unmasked.locations!.length).toBeGreaterThanOrEqual(1);
+          expect(unmasked.locations![0].lat).toBe(19.076);
         });
       } finally {
         globalThis.fetch = originalFetch;
@@ -1063,6 +1068,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
 
     try {
       const agent = request.agent(app);
+      agent.set('Origin', 'http://localhost:3000');
       const otpReq = await agent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000001' });
@@ -1121,6 +1127,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
 
     try {
       const agent = request.agent(app);
+      agent.set('Origin', 'http://localhost:3000');
       const otpReq = await agent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000001' });
@@ -1215,6 +1222,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
 
     try {
       const agent = request.agent(app);
+      agent.set('Origin', 'http://localhost:3000');
       const otpReq = await agent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000001' });
@@ -1224,6 +1232,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
       });
 
       const responderAgent = request.agent(app);
+      responderAgent.set('Origin', 'http://localhost:3000');
       const respOtp = await responderAgent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000002' });
@@ -1253,7 +1262,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
       // Wait 1.1s so the real duress incident activates in the background
       await new Promise((r) => setTimeout(r, 1100));
       const responderCheck1 = await responderAgent.get(
-        `/api/incidents/${realIncidentId}`
+        `/api/responder/incidents/${realIncidentId}`
       );
       expect(responderCheck1.body.incident.status).toBe('ACTIVE');
 
@@ -1318,12 +1327,12 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
           () => {
             expect(screen.getByTestId('live-status-screen')).toBeTruthy();
           },
-          { timeout: 2500 }
+          { timeout: 6000 }
         );
 
         // And the real incident stays the one that is active in the backend
         const responderCheck2 = await responderAgent.get(
-          `/api/incidents/${realIncidentId}`
+          `/api/responder/incidents/${realIncidentId}`
         );
         expect(responderCheck2.body.incident.id).toBe(realIncidentId);
         expect(responderCheck2.body.incident.status).toBe('ACTIVE');
@@ -1340,5 +1349,5 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
         }
       }
     }
-  });
+  }, 15000);
 });

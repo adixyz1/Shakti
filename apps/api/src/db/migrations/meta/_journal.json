@@ -36,6 +36,62 @@
       "when": 1791152380055,
       "tag": "0004_heavy_living_lightning",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791179000000,
+      "tag": "0005_contact_incident_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791248000000,
+      "tag": "0006_responders_routing_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791255000000,
+      "tag": "0007_safe_journeys",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791269000000,
+      "tag": "0008_reports_safety_layer",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1791275000000,
+      "tag": "0009_resources_safety_pulses",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791280000000,
+      "tag": "0010_journeys_note",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1791285000000,
+      "tag": "0011_post_incident_ratings",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1791290000000,
+      "tag": "0012_demo_mode_flags",
+      "breakpoints": true
     }
   ]
 }

@@ -2,9 +2,20 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { config } from '../core/config';
 import { getDb, type AppDatabase } from '../core/db';
 import { logger } from '../core/security';
-import { incidents, OPEN_INCIDENT_STATUSES, users } from '../db/schema';
+import {
+  incidents,
+  journeys,
+  OPEN_INCIDENT_STATUSES,
+  users,
+} from '../db/schema';
+import { type PushProvider } from '../providers/push';
+import { type SmsProvider } from '../providers/sms';
 import { getHydratedIncident } from './incidentService';
 import { transition } from './incidentStateMachine';
+import {
+  lapseJourneyIfDue,
+  sendJourneyReminderIfDue,
+} from './journeyService';
 import {
   dispatchFinalGatewayEscalation,
   dispatchInitialActiveNotifications,
@@ -15,12 +26,21 @@ import { broadcastIncidentUpdate } from './wsHub';
 
 const activeTimers = new Map<string, NodeJS.Timeout>();
 const escalationTimers = new Map<string, NodeJS.Timeout[]>();
+const expiryTimers = new Map<string, NodeJS.Timeout>();
+const journeyReminderTimers = new Map<string, NodeJS.Timeout>();
+const journeyLapseTimers = new Map<string, NodeJS.Timeout>();
 
 export interface EscalationScheduleOptions {
   step1DelayMs?: number;
   step2DelayMs?: number;
   autoExpireMs?: number;
   providers?: NotificationProviders;
+}
+
+export interface JourneyScheduleOptions {
+  reminderLeadMs?: number;
+  pushProvider?: PushProvider;
+  smsProvider?: SmsProvider;
 }
 
 export function cancelScheduledActivation(incidentId: string): void {
@@ -30,6 +50,7 @@ export function cancelScheduledActivation(incidentId: string): void {
     activeTimers.delete(incidentId);
   }
   cancelScheduledEscalation(incidentId);
+  cancelScheduledExpiry(incidentId);
 }
 
 export function cancelScheduledEscalation(incidentId: string): void {
@@ -40,6 +61,38 @@ export function cancelScheduledEscalation(incidentId: string): void {
     }
     escalationTimers.delete(incidentId);
   }
+}
+
+export function hasScheduledEscalation(incidentId: string): boolean {
+  const timers = escalationTimers.get(incidentId);
+  return Boolean(timers && timers.length > 0);
+}
+
+export function cancelScheduledExpiry(incidentId: string): void {
+  const timer = expiryTimers.get(incidentId);
+  if (timer) {
+    clearTimeout(timer);
+    expiryTimers.delete(incidentId);
+  }
+}
+
+export function cancelScheduledJourneyTimers(journeyId: string): void {
+  const rTimer = journeyReminderTimers.get(journeyId);
+  if (rTimer) {
+    clearTimeout(rTimer);
+    journeyReminderTimers.delete(journeyId);
+  }
+  const lTimer = journeyLapseTimers.get(journeyId);
+  if (lTimer) {
+    clearTimeout(lTimer);
+    journeyLapseTimers.delete(journeyId);
+  }
+}
+
+export function hasScheduledJourneyTimers(journeyId: string): boolean {
+  return (
+    journeyReminderTimers.has(journeyId) || journeyLapseTimers.has(journeyId)
+  );
 }
 
 export function clearAllScheduledTimers(): void {
@@ -53,6 +106,18 @@ export function clearAllScheduledTimers(): void {
     }
   }
   escalationTimers.clear();
+  for (const timer of expiryTimers.values()) {
+    clearTimeout(timer);
+  }
+  expiryTimers.clear();
+  for (const timer of journeyReminderTimers.values()) {
+    clearTimeout(timer);
+  }
+  journeyReminderTimers.clear();
+  for (const timer of journeyLapseTimers.values()) {
+    clearTimeout(timer);
+  }
+  journeyLapseTimers.clear();
 }
 
 function isUnacknowledgedOpenStatus(status: string): boolean {
@@ -65,6 +130,7 @@ export function scheduleEscalationLadder(
   options?: EscalationScheduleOptions
 ): void {
   cancelScheduledEscalation(incidentId);
+  cancelScheduledExpiry(incidentId);
 
   const db = dbInstance || getDb();
   const step1DelayMs =
@@ -134,6 +200,7 @@ export function scheduleEscalationLadder(
 
       if (current && OPEN_INCIDENT_STATUSES.includes(current.status)) {
         cancelScheduledEscalation(incidentId);
+        cancelScheduledExpiry(incidentId);
         await transition(
           incidentId,
           'EXPIRED',
@@ -164,8 +231,9 @@ export function scheduleEscalationLadder(
   if (typeof t2.unref === 'function') t2.unref();
   if (typeof tExpire.unref === 'function') tExpire.unref();
 
-  timers.push(t1, t2, tExpire);
+  timers.push(t1, t2);
   escalationTimers.set(incidentId, timers);
+  expiryTimers.set(incidentId, tExpire);
 }
 
 export async function activateAndDispatchIncident(
@@ -424,4 +492,143 @@ export async function recoverPendingIncidentsOnStartup(
   }
 
   return scheduledCount;
+}
+
+/**
+ * Schedules server-side reminder (T-minus configurable, default 3 minutes) and
+ * lapse timers for an active journey so a lapse works even if the phone is offline.
+ */
+export function scheduleJourneyTimers(
+  journey: {
+    id: string;
+    endsAt: string;
+    status: string;
+    reminderSentAt?: string | null;
+  },
+  dbInstance?: AppDatabase,
+  options?: JourneyScheduleOptions
+): void {
+  const journeyId = journey.id;
+  cancelScheduledJourneyTimers(journeyId);
+
+  if (journey.status !== 'active') {
+    return;
+  }
+
+  const db = dbInstance || getDb();
+  const leadMs =
+    options?.reminderLeadMs ??
+    config.journeyReminderLeadMinutes * 60 * 1000;
+
+  const nowMs = Date.now();
+  const endsMs = new Date(journey.endsAt).getTime();
+  const reminderTargetMs = endsMs - leadMs;
+
+  // Schedule T-minus reminder if not already sent
+  if (!journey.reminderSentAt) {
+    const reminderDelayMs = Math.max(0, reminderTargetMs - nowMs);
+    const rTimer = setTimeout(async () => {
+      journeyReminderTimers.delete(journeyId);
+      try {
+        await sendJourneyReminderIfDue(
+          journeyId,
+          db,
+          options?.pushProvider
+        );
+      } catch (err) {
+        logger.warn(
+          `Journey reminder timer failed for ${journeyId}: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+      }
+    }, reminderDelayMs);
+    if (typeof rTimer.unref === 'function') rTimer.unref();
+    journeyReminderTimers.set(journeyId, rTimer);
+  }
+
+  // Schedule lapse timer
+  const lapseDelayMs = Math.max(0, endsMs - nowMs);
+  const lTimer = setTimeout(async () => {
+    journeyLapseTimers.delete(journeyId);
+    journeyReminderTimers.delete(journeyId);
+    try {
+      await lapseJourneyIfDue(journeyId, db, options?.smsProvider);
+    } catch (err) {
+      logger.warn(
+        `Journey lapse timer failed for ${journeyId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+    }
+  }, lapseDelayMs);
+  if (typeof lTimer.unref === 'function') lTimer.unref();
+  journeyLapseTimers.set(journeyId, lTimer);
+}
+
+/**
+ * Re-reads active (and un-notified lapsed) journeys on startup so timers survive
+ * a server restart and never re-send an already-sent reminder or lapse notice.
+ */
+export async function recoverActiveJourneysOnStartup(
+  dbInstance?: AppDatabase,
+  options?: JourneyScheduleOptions
+): Promise<number> {
+  const db = dbInstance || getDb();
+  const leadMs =
+    options?.reminderLeadMs ??
+    config.journeyReminderLeadMinutes * 60 * 1000;
+
+  const activeRows = await db
+    .select()
+    .from(journeys)
+    .where(inArray(journeys.status, ['active', 'lapsed']));
+
+  let recovered = 0;
+  for (const row of activeRows) {
+    if (row.status === 'lapsed') {
+      // If already lapsed and notified before restart, never re-send
+      if (!row.lapsedNotifiedAt) {
+        await lapseJourneyIfDue(row.id, db, options?.smsProvider);
+        recovered++;
+      }
+      continue;
+    }
+
+    const nowMs = Date.now();
+    const endsMs = new Date(row.endsAt).getTime();
+
+    if (endsMs <= nowMs) {
+      // Already past ends_at on startup -> lapse immediately (idempotent)
+      await lapseJourneyIfDue(row.id, db, options?.smsProvider);
+      recovered++;
+      continue;
+    }
+
+    const reminderTargetMs = endsMs - leadMs;
+    let currentReminderSentAt = row.reminderSentAt;
+    if (!currentReminderSentAt && reminderTargetMs <= nowMs) {
+      // Already inside the reminder window on startup and reminder not sent yet -> send once now
+      await sendJourneyReminderIfDue(row.id, db, options?.pushProvider);
+      currentReminderSentAt = new Date().toISOString();
+    }
+
+    scheduleJourneyTimers(
+      {
+        id: row.id,
+        endsAt: row.endsAt,
+        status: row.status,
+        reminderSentAt: currentReminderSentAt,
+      },
+      db,
+      options
+    );
+    recovered++;
+  }
+
+  if (recovered > 0) {
+    logger.info(`Recovered ${recovered} journey(s) on startup`);
+  }
+
+  return recovered;
 }

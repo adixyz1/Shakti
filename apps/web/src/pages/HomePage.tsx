@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { BigButton, Button, Card, Spinner } from '../components/ui';
 import { PageLayout } from '../components/PageLayout';
+import { PostIncidentRatingCard } from '../components/PostIncidentRatingCard';
 import { useAuthStore } from '../store/authStore';
 import {
   ApiError,
@@ -49,6 +50,8 @@ import {
 } from '../lib/offlineQueue';
 import { useTriggerSettingsStore } from '../store/triggerSettingsStore';
 import { DisguiseCalculator } from '../components/DisguiseCalculator';
+import { SafetyPulseCard } from '../components/SafetyPulseCard';
+import { DemoSimulatePanel } from '../components/DemoSimulatePanel';
 
 const HOLD_DURATION_MS = 2000;
 const HOLD_TICK_MS = 100;
@@ -632,10 +635,13 @@ export const HomePage: React.FC = () => {
     if (!incident) return;
 
     // Task 4: Cancel while queued offline — remove alert from queue so it is never sent
-    if (incident.id.startsWith('queued_')) {
+    if (incident.id.startsWith('queued_') || queuedAlerts.length > 0) {
       setIsCancelling(true);
       try {
         await cancelQueuedAlert(incident.client_request_id);
+        for (const q of queuedAlerts) {
+          await cancelQueuedAlert(q.client_request_id);
+        }
         setIncident({
           ...incident,
           status: 'CANCELLED',
@@ -660,11 +666,7 @@ export const HomePage: React.FC = () => {
     setPinError(null);
     try {
       const res = await incidentsApi.cancelIncident(incident.id, {});
-      if (res._duress_keep_location_active) {
-        setSilentDuressIncidentId(incident.id);
-      } else {
-        setSilentDuressIncidentId(null);
-      }
+      setSilentDuressIncidentId(null);
       setIncident(res.incident);
       setShowPinKeypad(false);
     } catch (err) {
@@ -709,11 +711,7 @@ export const HomePage: React.FC = () => {
       const res = await incidentsApi.cancelIncident(incident.id, {
         pin: pinDigits,
       });
-      if (res._duress_keep_location_active) {
-        setSilentDuressIncidentId(incident.id);
-      } else {
-        setSilentDuressIncidentId(null);
-      }
+      setSilentDuressIncidentId(user?.has_duress_pin ? incident.id : null);
       setIncident(res.incident);
       setShowPinKeypad(false);
       setPinDigits('');
@@ -1402,11 +1400,12 @@ export const HomePage: React.FC = () => {
           </section>
         )}
 
-        {/* SCREEN 2: LIVE STATUS SCREEN (ACTIVE / NOTIFIED / ACKNOWLEDGED / ESCALATED) */}
+        {/* SCREEN 2: LIVE STATUS SCREEN (ACTIVE / NOTIFIED / ACKNOWLEDGED / RESPONDING / ESCALATED) */}
         {incident &&
           (incident.status === 'ACTIVE' ||
             incident.status === 'NOTIFIED' ||
             incident.status === 'ACKNOWLEDGED' ||
+            incident.status === 'RESPONDING' ||
             incident.status === 'ESCALATED') && (
             <section
               aria-label="Live alert status"
@@ -1447,11 +1446,21 @@ export const HomePage: React.FC = () => {
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="w-7 h-7 text-teal-700 dark:text-teal-400 shrink-0 mt-0.5" />
                   <div className="space-y-1">
+                    {incident.status !== 'ACTIVE' && (
+                      <p
+                        data-testid="contacts-notified-badge"
+                        className="text-xs font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400"
+                      >
+                        {t('sos.live.contactsNotifiedBadge')}
+                      </p>
+                    )}
                     <h1
                       data-testid="live-status-heading"
                       className="text-2xl font-bold text-slate-900 dark:text-slate-50"
                     >
-                      {incident.status === 'ACKNOWLEDGED'
+                      {incident.status === 'RESPONDING'
+                        ? t('sos.live.statusRespondingTitle')
+                        : incident.status === 'ACKNOWLEDGED'
                         ? t('sos.live.statusAcknowledgedTitle')
                         : incident.status === 'ESCALATED'
                         ? t('sos.live.statusEscalatedTitle')
@@ -1460,7 +1469,9 @@ export const HomePage: React.FC = () => {
                         : t('sos.live.statusActiveTitle')}
                     </h1>
                     <p className="text-sm text-slate-600 dark:text-slate-300">
-                      {incident.status === 'ACKNOWLEDGED'
+                      {incident.status === 'RESPONDING'
+                        ? t('sos.live.statusRespondingBody')
+                        : incident.status === 'ACKNOWLEDGED'
                         ? t('sos.live.statusAcknowledgedBody')
                         : incident.status === 'ESCALATED'
                         ? t('sos.live.statusEscalatedBody')
@@ -1551,6 +1562,9 @@ export const HomePage: React.FC = () => {
                   {t('sos.live.backToReadyBtn')}
                 </BigButton>
               </Card>
+
+              {/* Post-incident rating card: only shown after incident closes (normal or masked duress) */}
+              <PostIncidentRatingCard incidentId={incident.id} />
             </section>
           )}
 
@@ -1687,6 +1701,27 @@ export const HomePage: React.FC = () => {
               className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-center gap-4 text-sm font-medium text-slate-600 dark:text-slate-400"
             >
               <Link
+                to="/journeys"
+                data-testid="home-journeys-link"
+                className="min-h-[44px] px-3 inline-flex items-center gap-1.5 hover:text-teal-700 dark:hover:text-teal-400 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded-lg"
+              >
+                {t('journeys.navLink')}
+              </Link>
+              <Link
+                to="/reports"
+                data-testid="home-reports-link"
+                className="min-h-[44px] px-3 inline-flex items-center gap-1.5 hover:text-teal-700 dark:hover:text-teal-400 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded-lg"
+              >
+                {t('reports.navLink')}
+              </Link>
+              <Link
+                to="/resources"
+                data-testid="home-resources-link"
+                className="min-h-[44px] px-3 inline-flex items-center gap-1.5 hover:text-teal-700 dark:hover:text-teal-400 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded-lg"
+              >
+                {t('resources.navLink')}
+              </Link>
+              <Link
                 to="/circle"
                 className="min-h-[44px] px-3 inline-flex items-center gap-1.5 hover:text-teal-700 dark:hover:text-teal-400 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded-lg"
               >
@@ -1707,6 +1742,20 @@ export const HomePage: React.FC = () => {
                 {t('sos.secondary.guideLink')}
               </Link>
             </nav>
+
+            {/* Small dismissible weekly Safety Pulse card (never covering SOS, never shown during an active/queued alert or in disguise mode) */}
+            <SafetyPulseCard
+              hasActiveAlert={
+                Boolean(incident && isOpenIncident(incident.status)) ||
+                queuedAlerts.length > 0
+              }
+              isDisguised={Boolean(disguiseEnabled)}
+            />
+
+            <DemoSimulatePanel
+              incidentId={incident?.id}
+              onSimulated={() => void loadSafetyOverview()}
+            />
           </section>
         )}
       </div>

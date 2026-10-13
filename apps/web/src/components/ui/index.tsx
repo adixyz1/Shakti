@@ -21,19 +21,21 @@ export const Spinner: React.FC<{ className?: string }> = ({ className = 'w-5 h-5
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
   isLoading?: boolean;
+  fullWidth?: boolean;
 }
 
 export const Button: React.FC<ButtonProps> = ({
   children,
   variant = 'primary',
   isLoading = false,
+  fullWidth = false,
   className = '',
   disabled,
   ...props
 }) => {
   const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
     primary:
-      'bg-teal-700 text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500',
+      'bg-teal-700 text-white hover:bg-teal-800 dark:bg-teal-700 dark:hover:bg-teal-800',
     secondary:
       'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200',
     outline:
@@ -41,13 +43,13 @@ export const Button: React.FC<ButtonProps> = ({
     ghost:
       'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800',
     danger:
-      'bg-rose-700 text-white hover:bg-rose-800 dark:bg-rose-600 dark:hover:bg-rose-500',
+      'bg-rose-700 text-white hover:bg-rose-800 dark:bg-rose-700 dark:hover:bg-rose-800',
   };
 
   return (
     <button
       disabled={disabled || isLoading}
-      className={`min-h-[44px] px-4 py-2 rounded-xl font-medium text-sm inline-flex items-center justify-center gap-2 whitespace-nowrap transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 disabled:opacity-50 disabled:pointer-events-none ${variants[variant]} ${className}`}
+      className={`min-h-[44px] px-4 py-2 rounded-xl font-medium text-sm inline-flex items-center justify-center gap-2 whitespace-nowrap transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 disabled:opacity-50 disabled:pointer-events-none ${fullWidth ? 'w-full' : ''} ${variants[variant]} ${className}`}
       {...props}
     >
       {isLoading && <Spinner className="w-4 h-4" />}
@@ -66,7 +68,7 @@ export const BigButton: React.FC<ButtonProps> = ({
 }) => {
   const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
     primary:
-      'bg-teal-700 text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 shadow-sm',
+      'bg-teal-700 text-white hover:bg-teal-800 dark:bg-teal-700 dark:hover:bg-teal-800 shadow-sm',
     secondary:
       'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900',
     outline:
@@ -74,7 +76,7 @@ export const BigButton: React.FC<ButtonProps> = ({
     ghost:
       'text-slate-800 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800',
     danger:
-      'bg-rose-700 text-white hover:bg-rose-800 dark:bg-rose-600 dark:hover:bg-rose-500 shadow-sm',
+      'bg-rose-700 text-white hover:bg-rose-800 dark:bg-rose-700 dark:hover:bg-rose-800 shadow-sm',
   };
 
   return (
@@ -89,12 +91,15 @@ export const BigButton: React.FC<ButtonProps> = ({
   );
 };
 
-export const Card: React.FC<{
-  children: React.ReactNode;
-  className?: string;
-}> = ({ children, className = '' }) => (
+export const Card: React.FC<
+  React.HTMLAttributes<HTMLDivElement> & {
+    children: React.ReactNode;
+    className?: string;
+  }
+> = ({ children, className = '', ...props }) => (
   <div
     className={`rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 ${className}`}
+    {...props}
   >
     {children}
   </div>

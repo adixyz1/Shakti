@@ -14,6 +14,7 @@ import {
 } from '../core/security';
 import { users } from '../db/schema';
 import {
+  deleteAccountSchema,
   otpRequestSchema,
   otpVerifySchema,
   updateMeSchema,
@@ -24,6 +25,10 @@ import {
   toUserResponseDto,
   verifyOtpForPhone,
 } from '../services/authService';
+import {
+  deleteUserAccount,
+  exportUserData,
+} from '../services/privacyService';
 
 export const apiRouter = Router();
 
@@ -139,20 +144,87 @@ apiRouter.patch('/me', requireAuth, async (req: Request, res: Response) => {
   const currentUser = req.user!;
   const nextName = parsed.data.name ?? currentUser.name;
   const nextLang = parsed.data.language ?? currentUser.language;
+  const nextOrgZone =
+    parsed.data.organization ??
+    parsed.data.organization_zone ??
+    currentUser.organization ??
+    currentUser.organizationZone;
 
   const db = getDb();
   await db
     .update(users)
-    .set({ name: nextName, language: nextLang })
+    .set({
+      name: nextName,
+      language: nextLang,
+      organization: nextOrgZone,
+      organizationZone: nextOrgZone,
+    })
     .where(eq(users.id, currentUser.id));
 
   const updated = {
     ...currentUser,
     name: nextName,
     language: nextLang,
+    organization: nextOrgZone,
+    organizationZone: nextOrgZone,
   };
   res.status(200).json(toUserResponseDto(updated));
 });
+
+apiRouter.get(
+  '/me/export',
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const db = getDb();
+      const exportData = await exportUserData(db, req.user!);
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="saathi-data-export.json"'
+      );
+      res.status(200).json(exportData);
+    } catch (err) {
+      if (err instanceof HttpError) {
+        res.status(err.status).json({ detail: err.message });
+        return;
+      }
+      res.status(500).json({ detail: 'Failed to export user data' });
+    }
+  }
+);
+
+apiRouter.delete(
+  '/me',
+  requireAuth,
+  async (req: Request, res: Response) => {
+    const parsed = deleteAccountSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      res.status(400).json({
+        detail: parsed.error.issues.map((i) => i.message).join('; '),
+      });
+      return;
+    }
+
+    try {
+      const db = getDb();
+      const result = await deleteUserAccount(db, req.user!, {
+        confirmation: parsed.data.confirmation,
+        otp_code: parsed.data.otp_code,
+        cancel_pin: parsed.data.cancel_pin,
+      });
+
+      clearAuthCookies(res);
+      res.status(200).json(result);
+    } catch (err) {
+      if (err instanceof HttpError) {
+        res.status(err.status).json({ detail: err.message });
+        return;
+      }
+      res.status(500).json({ detail: 'Failed to delete user account' });
+    }
+  }
+);
 
 apiRouter.get(
   '/rbac/admin-check',

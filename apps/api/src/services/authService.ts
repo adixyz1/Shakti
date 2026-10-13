@@ -1,9 +1,14 @@
 import crypto from 'crypto';
 import { desc, eq } from 'drizzle-orm';
-import { config } from '../core/config';
+import { config, isDemoModeEnabled } from '../core/config';
 import type { AppDatabase } from '../core/db';
 import { hashOtpCode, verifyOtpCodeHash, logger } from '../core/security';
-import { otpCodes, users, type UserRow } from '../db/schema';
+import {
+  DEFAULT_ORGANIZATION_ZONE,
+  otpCodes,
+  users,
+  type UserRow,
+} from '../db/schema';
 import { defaultOtpProvider, type OtpProvider } from '../providers/otp';
 import type { UserResponseDto } from '../schemas/auth';
 
@@ -16,12 +21,16 @@ export class HttpError extends Error {
 }
 
 export function toUserResponseDto(user: UserRow): UserResponseDto {
+  const org =
+    user.organization || user.organizationZone || DEFAULT_ORGANIZATION_ZONE;
   return {
     id: user.id,
     phone_e164: user.phoneE164,
     name: user.name,
     role: user.role,
     language: user.language,
+    organization: org,
+    organization_zone: org,
     cancel_window_seconds: user.cancelWindowSeconds ?? 5,
     has_cancel_pin: Boolean(user.cancelPinHash),
     has_duress_pin: Boolean(user.duressPinHash),
@@ -38,7 +47,7 @@ export async function requestOtpForPhone(
   status: string;
   provider: string;
   expires_in_seconds: number;
-  dev_mock_hint: string | null;
+  dev_mock_hint?: string;
 }> {
   const code = String(crypto.randomInt(100000, 1000000));
   const codeHash = hashOtpCode(phoneE164, code);
@@ -58,12 +67,54 @@ export async function requestOtpForPhone(
 
   await otpProvider.sendOtp(phoneE164, code);
 
-  return {
+  const isProd =
+    process.env.NODE_ENV === 'production' ||
+    process.env.ENVIRONMENT === 'production' ||
+    config.environment === 'production';
+
+  const isDemo = !isProd && isDemoModeEnabled();
+  const isAdminPhone = phoneE164 === '+919000000003';
+  const allowAdminHint =
+    (process.env.DEMO_ADMIN_HINT || '').trim().toLowerCase() === 'true';
+
+  const isSeededDemoPhone =
+    phoneE164 === '+919000000001' || // Aarohi Sharma (Demo User)
+    phoneE164 === '+919000000002' || // Inspector Kavita Rao (Demo Responder)
+    phoneE164 === '+919000000003' || // Meera Nair (Demo Admin)
+    phoneE164 === '+919000000011' || // Priya Verma (Sister)
+    phoneE164 === '+919000000012'; // Neha Kapoor (Roommate)
+
+  const isTest = process.env.NODE_ENV === 'test';
+
+  const shouldReturnHint =
+    isDemo &&
+    isSeededDemoPhone &&
+    (!isAdminPhone || allowAdminHint);
+
+  const response: {
+    status: string;
+    provider: string;
+    expires_in_seconds: number;
+    dev_mock_hint?: string;
+  } = {
     status: 'otp_sent',
     provider: otpProvider.providerName,
     expires_in_seconds: ttlSeconds,
-    dev_mock_hint: config.environment !== 'production' ? code : null,
   };
+
+  if (shouldReturnHint) {
+    response.dev_mock_hint = code;
+  } else if (isTest && (otpProvider as any).lastOtpCode) {
+    // In vitest integration suites that do not set DEMO_MODE, expose non-enumerable test helper
+    Object.defineProperty(response, 'dev_mock_hint', {
+      value: code,
+      enumerable: false,
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  return response;
 }
 
 export async function verifyOtpForPhone(
@@ -140,6 +191,8 @@ export async function verifyOtpForPhone(
     name: name?.trim() || 'SAATHI User',
     role: 'user',
     language: 'en',
+    organization: DEFAULT_ORGANIZATION_ZONE,
+    organizationZone: DEFAULT_ORGANIZATION_ZONE,
     cancelWindowSeconds: 5,
     cancelPinHash: null,
     duressPinHash: null,

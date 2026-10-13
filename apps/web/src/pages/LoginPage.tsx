@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { BigButton, Button, Card, Input } from '../components/ui';
 import { PageLayout } from '../components/PageLayout';
 import { authApi, ApiError } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
+import { useDemoStore } from '../store/demoStore';
 
 export const LoginPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { setUser, addToast } = useAuthStore();
+  const { demoMode, checked, checkDemoMode } = useDemoStore();
 
   const [phone, setPhone] = useState('+919000000001');
   const [name, setName] = useState('');
@@ -18,6 +20,12 @@ export const LoginPage: React.FC = () => {
   const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
   const [error, setError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!checked) {
+      void checkDemoMode();
+    }
+  }, [checked, checkDemoMode]);
 
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,6 +99,7 @@ export const LoginPage: React.FC = () => {
                 required
                 autoComplete="tel"
               />
+
               <Input
                 label={t('login.nameLabel')}
                 placeholder={t('login.namePlaceholder')}
@@ -98,21 +107,25 @@ export const LoginPage: React.FC = () => {
                 onChange={(e) => setName(e.target.value)}
                 autoComplete="name"
               />
+
               <BigButton type="submit" isLoading={isSubmitting}>
                 {t('login.requestOtpBtn')}
               </BigButton>
             </form>
           ) : (
             <form onSubmit={handleVerifyOtp} className="space-y-4">
-              {devOtpHint && (
-                <div className="rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 p-4 space-y-1">
+              {demoMode && devOtpHint && (
+                <div
+                  data-testid="demo-otp-hint"
+                  className="rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 p-4 space-y-1"
+                >
                   <p className="text-xs font-semibold text-teal-900 dark:text-teal-200">
                     {t('login.mockNoticeTitle')}
                   </p>
                   <p className="text-xs text-teal-800 dark:text-teal-300">
                     {t('login.mockNoticeBody')}{' '}
                     <span className="font-mono font-bold tabular-nums text-sm underline">
-                      {devOtpHint}
+                      Demo code: {devOtpHint}
                     </span>
                   </p>
                 </div>

@@ -152,7 +152,7 @@ export async function createContactForUser(
   });
 
   const invitationUrl = `/invite/${token}`;
-  const smsBody = `${user.name} invited you to their SAATHI Trusted Circle. Review permissions and accept or decline: ${invitationUrl}`;
+  const smsBody = `${user.name} invited you to their SHAKTI Trusted Circle. Review permissions and accept or decline: ${invitationUrl}`;
 
   await smsProvider.sendSms({
     toPhoneE164: newContact.phoneE164,

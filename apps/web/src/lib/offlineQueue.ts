@@ -149,27 +149,7 @@ export async function enqueueOfflineAlert(
     // fallback to memoryQueuedAlerts if IDB unavailable
   }
 
-  // Request Background Sync if supported by browser ServiceWorkerRegistration
-  try {
-    if (
-      typeof navigator !== 'undefined' &&
-      'serviceWorker' in navigator &&
-      navigator.serviceWorker?.ready
-    ) {
-      void navigator.serviceWorker.ready
-        .then((reg: any) => {
-          if (reg?.sync && typeof reg.sync.register === 'function') {
-            return reg.sync.register('saathi-sos-queue-sync');
-          }
-        })
-        .catch(() => {
-          // ignore
-        });
-    }
-  } catch {
-    // ignore
-  }
-
+  notifyQueueChange();
   return fullEntry;
 }
 
@@ -226,7 +206,6 @@ export async function cancelQueuedAlert(
   clientRequestId: string
 ): Promise<boolean> {
   const hadMem = memoryQueuedAlerts.delete(clientRequestId);
-  notifyQueueChange();
   let hadDb = false;
   try {
     const existing = await offlineDb.queuedAlerts.get(clientRequestId);
@@ -237,6 +216,8 @@ export async function cancelQueuedAlert(
   } catch {
     // ignore
   }
+  memoryQueuedAlerts.delete(clientRequestId);
+  notifyQueueChange();
   return hadMem || hadDb;
 }
 
@@ -457,6 +438,58 @@ export async function clearOfflineEmergencyContactsCache(): Promise<void> {
   }
 }
 
+export async function clearAllBrowserCaches(): Promise<string[]> {
+  const deletedKeys: string[] = [];
+  if (typeof globalThis.caches !== 'undefined' && typeof globalThis.caches.keys === 'function') {
+    try {
+      const keys = await globalThis.caches.keys();
+      for (const key of keys) {
+        await globalThis.caches.delete(key);
+        deletedKeys.push(key);
+      }
+    } catch {
+      // ignore CacheStorage errors
+    }
+  }
+  return deletedKeys;
+}
+
+/**
+ * Fix A: Clear all CacheStorage caches, the IndexedDB queuedAlerts table,
+ * and the IndexedDB cachedContacts table on logout.
+ */
+export async function clearAllOfflineStateOnLogout(): Promise<{
+  deletedCaches: string[];
+}> {
+  await clearAllQueuedAlerts();
+  await clearOfflineEmergencyContactsCache();
+  const deletedCaches = await clearAllBrowserCaches();
+  return { deletedCaches };
+}
+
+/**
+ * Phase 8C Task 4: Clear all local data on this device:
+ * IndexedDB (queuedAlerts + cachedContacts), CacheStorage, localStorage, and sessionStorage.
+ */
+export async function clearUserLocalDataOnLogout(): Promise<{
+  deletedCaches: string[];
+}> {
+  const { deletedCaches } = await clearAllOfflineStateOnLogout();
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.clear();
+    } catch {
+      // ignore
+    }
+    try {
+      window.sessionStorage.clear();
+    } catch {
+      // ignore
+    }
+  }
+  return { deletedCaches };
+}
+
 /**
  * Task 7: SMS Fallback Link Builder.
  * Handles Android vs iOS `sms:` URI differences:
@@ -500,7 +533,7 @@ export function buildEmergencySmsBody(options: {
     locPart = `Last known location: ${mapUrl}`;
   }
 
-  return `SAATHI SOS Emergency Alert${namePart} (${timeStr}). I need help. ${locPart}`;
+  return `SHAKTI SOS Emergency Alert${namePart} (${timeStr}). I need help. ${locPart}`;
 }
 
 export function buildSmsFallbackHref(

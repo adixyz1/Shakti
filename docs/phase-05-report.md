@@ -22,7 +22,8 @@
 
 2. **Offline Queue in IndexedDB (`apps/web/src/lib/offlineQueue.ts`, `apps/web/src/lib/sos.ts`)**:
    - Created `SaathiOfflineDatabase` using **Dexie** (`saathi_offline_db`) with `queuedAlerts` (`client_request_id`, `client_created_at`, `source_trigger`, `emergency_type`, `location`, `attempts`, `next_retry_at`, `status`, `last_error`) and `cachedContacts`.
-   - When `navigator.onLine === false` or `POST /api/incidents` fails due to network error, `triggerSos(source)` stores the alert in IndexedDB, registers a Background Sync tag (`saathi-sos-queue-sync`) where supported, and retries automatically on `window` `online` and `focus` events using exponential backoff with jitter (`computeBackoffDelayMs`).
+   - When `navigator.onLine === false` or `POST /api/incidents` fails due to network error, `triggerSos(source)` stores the alert in IndexedDB and retries automatically when the app is open (`window` `online`, `focus`, or manual retry) using exponential backoff with jitter (`computeBackoffDelayMs`).
+   - Background Sync is not implemented; queued alerts are sent only when the app is open.
 
 3. **Idempotency (`apps/web/src/lib/offlineQueue.ts`)**:
    - Every retry reuses the original `client_request_id` so the backend's idempotency check returns `idempotent_replay: true` and never creates duplicate incidents.
@@ -47,7 +48,7 @@
 
 9. **Honest Status UI (`apps/web/src/components/PageLayout.tsx`, `apps/web/src/pages/HomePage.tsx`)**:
    - Persistent connectivity indicator in the top bar (`"Online — Connected to SAATHI"` / `"Offline — Alerts will queue & offer SMS fallback"`).
-   - Displays `"Not sent yet. Retrying. Tap to send by SMS"` while queued, and only shows `"Sent at HH:MM"` after the server confirms creation/activation. Includes direct `Call 112` and `Call 181` buttons on the offline/queued panel.
+   - Displays `"Saved on this phone. It will be sent when you open the app with a connection. If you can, send it by SMS now."` while queued, and only shows `"Sent at HH:MM"` after the server confirms creation/activation. Includes direct `Call 112` and `Call 181` buttons on the offline/queued panel.
 
 10. **Low-Battery / Data-Saver Mode (`apps/web/src/store/triggerSettingsStore.ts`, `SettingsPage.tsx`, `HomePage.tsx`)**:
     - Added a setting in `SettingsPage.tsx` (plus an automatic suggestion banner when `navigator.getBattery()` reports `<= 20%` and not charging) that disables the SVG hold-progress ring and CSS scale animations, avoids map tiles, and uses text-only status updates.
@@ -87,7 +88,7 @@
 
 ### B. Production Build Offline Run (`npm run test:offline:prod`)
 - **Browser / Environment Disclosure**: I did **not** use a real headless Chromium/Playwright browser binary because Chromium is not installed in this container environment. Instead, I verified the production build (`vite build` + Workbox `dist/sw.js` served by the real Express server) using two complementary runs:
-  1. `phase5_offline_connectivity.test.tsx` (Test 6): Renders the React app in JSDOM (`fake-indexeddb` + `WebSocket`) against a live **Express + SQLite + WebSocket** server, loads the app online (caching accepted SOS contacts), switches `navigator.onLine = false` and cuts network requests, triggers SOS, verifies `"Not sent yet. Retrying. Tap to send by SMS"` and the `sms:` links, switches back online (`window.dispatchEvent(new Event('online'))`), and confirms the queued alert is flushed and delivered to the server **exactly once** with `"Sent at HH:MM"`.
+  1. `phase5_offline_connectivity.test.tsx` (Test 6): Renders the React app in JSDOM (`fake-indexeddb` + `WebSocket`) against a live **Express + SQLite + WebSocket** server, loads the app online (caching accepted SOS contacts), switches `navigator.onLine = false` and cuts network requests, triggers SOS, verifies `"Saved on this phone. It will be sent when you open the app with a connection. If you can, send it by SMS now."` and the `sms:` links, switches back online (`window.dispatchEvent(new Event('online'))`), and confirms the queued alert is flushed and delivered to the server **exactly once** with `"Sent at HH:MM"`.
   2. `npm run test:offline:prod` (`scripts/verify_offline_prod.ts`): Builds the production bundle (`dist/sw.js`, `dist/workbox-*.js`, `dist/manifest.webmanifest`, `dist/index.html`), mounts `dist/` on the Express server, verifies HTTP 200 responses for `/sw.js`, `/manifest.webmanifest`, and `/home`, and runs the offline-to-online queue and SMS fallback flow against the server:
 
 ```text

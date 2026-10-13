@@ -1,11 +1,14 @@
 import React, { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { useTriggerSettingsStore } from '../store/triggerSettingsStore';
+import {
+  useTriggerSettingsStore,
+  verifyVoiceCodewordTranscript,
+} from '../store/triggerSettingsStore';
 import { getPracticeModeTarget, triggerSos } from '../lib/sos';
 
 const DISGUISE_TITLE = 'Calculator';
-const DEFAULT_TITLE = 'SAATHI — Safety Assistance & Alert Technology';
+const DEFAULT_TITLE = 'SHAKTI — Safety Assistance & Alert Technology';
 const DISGUISE_ICON_DATA_URI =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231e293b'/%3E%3Crect x='14' y='12' width='36' height='12' rx='4' fill='%230f172a'/%3E%3Ccircle cx='20' cy='34' r='4' fill='%2394a3b8'/%3E%3Ccircle cx='32' cy='34' r='4' fill='%2394a3b8'/%3E%3Ccircle cx='44' cy='34' r='4' fill='%23f59e0b'/%3E%3Ccircle cx='20' cy='46' r='4' fill='%2394a3b8'/%3E%3Ccircle cx='32' cy='46' r='4' fill='%2394a3b8'/%3E%3Ccircle cx='44' cy='46' r='4' fill='%2314b8a6'/%3E%3C/svg%3E";
 const DEFAULT_ICON_HREF = '/icon.svg';
@@ -72,7 +75,7 @@ export const DiscreetTriggersManager: React.FC = () => {
     shakeEnabled,
     shakeThreshold,
     voiceEnabled,
-    voiceCodeword,
+    voiceCodewordHash,
     voiceConsentGranted,
     disguiseEnabled,
     disguiseUnlockedSession,
@@ -115,6 +118,24 @@ export const DiscreetTriggersManager: React.FC = () => {
     iconLink.href = isCurrentlyDisguised
       ? DISGUISE_ICON_DATA_URI
       : DEFAULT_ICON_HREF;
+
+    const manifestLink = document.querySelector(
+      'link[rel="manifest"]'
+    ) as HTMLLinkElement | null;
+    if (manifestLink) {
+      manifestLink.setAttribute(
+        'href',
+        isCurrentlyDisguised
+          ? `data:application/manifest+json,${encodeURIComponent(
+              JSON.stringify({
+                name: DISGUISE_TITLE,
+                short_name: DISGUISE_TITLE,
+                display: 'standalone',
+              })
+            )}`
+          : '/manifest.webmanifest'
+      );
+    }
   }, [user, disguiseEnabled, disguiseUnlockedSession]);
 
   // 2. Keyboard Shortcut Trigger (Desktop)
@@ -172,9 +193,9 @@ export const DiscreetTriggersManager: React.FC = () => {
     };
   }, [user, shakeEnabled, shakeThreshold, location.pathname]);
 
-  // 4. Voice Code Word Trigger (Experimental Web Speech API, requires explicit consent)
+  // 4. Voice Code Word Trigger (Experimental Web Speech API, requires explicit consent & configured PBKDF2 codeword hash)
   useEffect(() => {
-    if (!user || !voiceEnabled || !voiceConsentGranted) {
+    if (!user || !voiceEnabled || !voiceConsentGranted || !voiceCodewordHash) {
       return;
     }
 
@@ -194,22 +215,29 @@ export const DiscreetTriggersManager: React.FC = () => {
 
       recognition.onresult = (event: any) => {
         if (stopped) return;
-        const targetWord = (voiceCodeword || '').trim().toLowerCase();
-        if (!targetWord) return;
-
         const results = event?.results;
         if (!results) return;
 
-        for (let i = event.resultIndex || 0; i < results.length; i++) {
-          const item = results[i];
-          const transcript = String(item?.[0]?.transcript || '')
-            .trim()
-            .toLowerCase();
-          if (transcript && transcript.includes(targetWord)) {
-            fireDiscreetSos('voice');
-            break;
+        void (async () => {
+          for (let i = event.resultIndex || 0; i < results.length; i++) {
+            const item = results[i];
+            const transcript = String(item?.[0]?.transcript || '')
+              .trim()
+              .toLowerCase();
+            if (
+              transcript &&
+              (await verifyVoiceCodewordTranscript(
+                transcript,
+                voiceCodewordHash
+              ))
+            ) {
+              if (!stopped) {
+                fireDiscreetSos('voice');
+              }
+              break;
+            }
           }
-        }
+        })();
       };
 
       recognition.onerror = () => {
@@ -237,7 +265,7 @@ export const DiscreetTriggersManager: React.FC = () => {
     user,
     voiceEnabled,
     voiceConsentGranted,
-    voiceCodeword,
+    voiceCodewordHash,
     location.pathname,
   ]);
 

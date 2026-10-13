@@ -25,22 +25,13 @@ export default defineConfig(() => {
           navigateFallbackDenylist: [/^\/api\//, /^\/ws\//],
           runtimeCaching: [
             {
-              urlPattern: /^https?:\/\/.*\/api\/.*/i,
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'saathi-api-network-first',
-                networkTimeoutSeconds: 4,
-                expiration: {
-                  maxEntries: 50,
-                  maxAgeSeconds: 60 * 60 * 24,
-                },
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
-            },
-            {
-              urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico|woff2?)$/i,
+              urlPattern: ({ request, url }) =>
+                !url.pathname.startsWith('/api/') &&
+                (request.destination === 'image' ||
+                  request.destination === 'font' ||
+                  /\.(?:png|jpg|jpeg|svg|gif|webp|ico|woff2?)$/i.test(
+                    url.pathname
+                  )),
               handler: 'CacheFirst',
               options: {
                 cacheName: 'saathi-static-assets-cache-first',
@@ -69,6 +60,7 @@ export default defineConfig(() => {
     test: {
       environment: 'jsdom',
       globals: true,
+      exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
     },
   };
 });

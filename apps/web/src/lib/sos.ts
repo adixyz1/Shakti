@@ -148,15 +148,7 @@ export async function triggerSos(
     queued_offline: true,
   };
 
-  for (const listener of listeners) {
-    try {
-      listener(queuedResponse);
-    } catch {
-      // ignore listener errors
-    }
-  }
-
-  // Enqueue in IndexedDB (Dexie) for automatic retry + SMS fallback
+  // Enqueue in IndexedDB (Dexie) BEFORE notifying UI listeners so refreshQueuedAlertsState sees the entry immediately
   await enqueueOfflineAlert({
     client_request_id: clientRequestId,
     client_created_at: clientCreatedAt,
@@ -164,6 +156,14 @@ export async function triggerSos(
     emergency_type: null,
     location: options?.location ?? null,
   });
+
+  for (const listener of listeners) {
+    try {
+      listener(queuedResponse);
+    } catch {
+      // ignore listener errors
+    }
+  }
 
   return queuedResponse;
 }
@@ -175,6 +175,7 @@ export function isOpenIncident(incident: IncidentDto | null): boolean {
     incident.status === 'ACTIVE' ||
     incident.status === 'NOTIFIED' ||
     incident.status === 'ACKNOWLEDGED' ||
+    incident.status === 'RESPONDING' ||
     incident.status === 'ESCALATED'
   );
 }

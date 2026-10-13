@@ -10,12 +10,18 @@ export const REFRESH_COOKIE_NAME = 'saathi_refresh_token';
 const PHONE_E164_REGEX = /\+[1-9]\d{6,14}/g;
 const JWT_REGEX = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
 const INVITE_TOKEN_REGEX = /inv_[A-Za-z0-9_]+\.[A-Za-z0-9_]+/g;
+const CONTACT_ALERT_TOKEN_REGEX = /ctk_[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
+const COORD_PAIR_REGEX = /-?\d{1,2}\.\d{3,8}\s*,\s*-?\d{1,3}\.\d{3,8}/g;
+const PIN_JSON_REGEX = /"(?:pin|cancel_pin|duress_pin)"\s*:\s*"[^"]*"/gi;
 
 export function redactPII(text: string): string {
   return text
     .replace(PHONE_E164_REGEX, '[REDACTED_PHONE]')
     .replace(JWT_REGEX, '[REDACTED_TOKEN]')
-    .replace(INVITE_TOKEN_REGEX, '[REDACTED_TOKEN]');
+    .replace(INVITE_TOKEN_REGEX, '[REDACTED_TOKEN]')
+    .replace(CONTACT_ALERT_TOKEN_REGEX, '[REDACTED_TOKEN]')
+    .replace(COORD_PAIR_REGEX, '[REDACTED_COORDS]')
+    .replace(PIN_JSON_REGEX, '"pin":"[REDACTED_PIN]"');
 }
 
 export const logger = {
@@ -221,7 +227,10 @@ export function verifyToken(
 export function setAuthCookies(res: Response, userId: string, role: UserRole): void {
   const accessToken = createAccessToken(userId, role);
   const refreshToken = createRefreshToken(userId, role);
-  const isProd = config.environment === 'production';
+  const isProd =
+    process.env.NODE_ENV === 'production' ||
+    process.env.ENVIRONMENT === 'production' ||
+    config.environment === 'production';
 
   res.cookie(ACCESS_COOKIE_NAME, accessToken, {
     httpOnly: true,
@@ -291,5 +300,72 @@ export function verifyAndHashInvitationToken(token: string): string | null {
     return null;
   }
   return hashInvitationToken(token);
+}
+
+export function hashContactIncidentToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+export function createSignedContactIncidentToken(
+  incidentId: string,
+  contactId: string
+): {
+  token: string;
+  tokenHash: string;
+} {
+  const nonce = crypto.randomBytes(24).toString('hex');
+  const signature = crypto
+    .createHmac('sha256', config.jwtSecretKey)
+    .update(`ctk:${incidentId}:${contactId}:${nonce}`)
+    .digest('hex');
+  const token = `ctk_${nonce}.${signature}`;
+  return {
+    token,
+    tokenHash: hashContactIncidentToken(token),
+  };
+}
+
+export function verifyContactIncidentTokenSignature(
+  token: string,
+  incidentId: string,
+  contactId: string
+): boolean {
+  if (!token || !token.startsWith('ctk_')) {
+    return false;
+  }
+  const parts = token.slice(4).split('.');
+  if (parts.length !== 2) {
+    return false;
+  }
+  const [nonce, sig] = parts;
+  if (!nonce || !sig) {
+    return false;
+  }
+  const expectedSig = crypto
+    .createHmac('sha256', config.jwtSecretKey)
+    .update(`ctk:${incidentId}:${contactId}:${nonce}`)
+    .digest('hex');
+
+  const sigBuf = Buffer.from(sig, 'hex');
+  const expectedBuf = Buffer.from(expectedSig, 'hex');
+  if (sigBuf.length !== expectedBuf.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(sigBuf, expectedBuf);
+}
+
+export function parseAndHashContactIncidentToken(token: string): string | null {
+  if (!token || !token.startsWith('ctk_')) {
+    return null;
+  }
+  const parts = token.slice(4).split('.');
+  if (parts.length !== 2) {
+    return null;
+  }
+  const [nonce, sig] = parts;
+  if (!nonce || !sig) {
+    return null;
+  }
+  return hashContactIncidentToken(token);
 }
 

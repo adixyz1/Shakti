@@ -21,8 +21,10 @@ import { defaultPushProvider, type PushProvider } from '../providers/push';
 import { defaultSmsProvider, type SmsProvider } from '../providers/sms';
 import type { TrustedContactDto } from '../schemas/contact';
 import { getNotifiableContacts } from './contactService';
+import { issueContactIncidentMagicToken } from './contactIncidentTokenService';
 import { getHydratedIncident } from './incidentService';
 import { transition } from './incidentStateMachine';
+import { routeActiveIncidentToResponders } from './responderService';
 import { broadcastIncidentUpdate } from './wsHub';
 
 export interface NotificationProviders {
@@ -233,8 +235,14 @@ export async function dispatchToEligibleContacts(
         ? ` Location: ${latestSample.lat.toFixed(5)}, ${latestSample.lng.toFixed(5)}.`
         : '';
 
-    const messageTitle = `SAATHI SOS Alert: ${ownerName}`;
-    const messageBody = `URGENT: ${ownerName} triggered an emergency SOS alert on SAATHI.${coordsText} Please check in immediately or dial 112/181 if needed.`;
+    const magicLink = await issueContactIncidentMagicToken(
+      db,
+      incidentId,
+      contact.id
+    );
+
+    const messageTitle = `SHAKTI SOS Alert: ${ownerName}`;
+    const messageBody = `URGENT: ${ownerName} triggered an emergency SOS alert on SHAKTI.${coordsText} Respond immediately: ${magicLink.urlPath} or dial 112/181 if needed.`;
 
     // 1. Push channel (independent)
     const pushAlreadySent = await alreadyDispatchedChannel(
@@ -257,6 +265,7 @@ export async function dispatchToEligibleContacts(
             body: messageBody,
             data: {
               incident_id: incidentId,
+              contact_url: magicLink.urlPath,
               ...(canIncludeCoords && latestSample
                 ? { lat: latestSample.lat, lng: latestSample.lng }
                 : {}),
@@ -289,6 +298,10 @@ export async function dispatchToEligibleContacts(
             metadata: {
               incident_id: incidentId,
               contact_id: contact.id,
+              contact_name: contact.name,
+              contact_url: magicLink.urlPath,
+              token: magicLink.token,
+              expires_at: new Date(magicLink.expiresAt).toISOString(),
               ...(canIncludeCoords && latestSample
                 ? { lat: latestSample.lat, lng: latestSample.lng }
                 : {}),
@@ -326,7 +339,9 @@ export async function dispatchToEligibleContacts(
 }
 
 /**
- * Step 0 (t=0 on ACTIVE): Notify priority #1 eligible contact from getNotifiableContacts(userId, 'sos').
+ * Step 0 (t=0 on ACTIVE):
+ * 1. Route incident to all active, on-duty responders in the user's organization_zone and notify them via PushProvider (mock) when data_processing consent is active.
+ * 2. Notify priority #1 eligible contact from getNotifiableContacts(userId, 'sos').
  */
 export async function dispatchInitialActiveNotifications(
   incidentId: string,
@@ -334,6 +349,8 @@ export async function dispatchInitialActiveNotifications(
   providers?: NotificationProviders
 ): Promise<{ sentCount: number; failedCount: number }> {
   const db = dbInstance || getDb();
+  const pushProvider = providers?.pushProvider || defaultPushProvider;
+
   const [inc] = await db
     .select()
     .from(incidents)
@@ -344,15 +361,96 @@ export async function dispatchInitialActiveNotifications(
     return { sentCount: 0, failedCount: 0 };
   }
 
+  // Respect data_processing consent before routing/notifying responders or contacts
+  const dpConsentRows = await db
+    .select()
+    .from(consents)
+    .where(
+      and(
+        eq(consents.userId, inc.userId),
+        eq(consents.type, 'data_processing')
+      )
+    )
+    .orderBy(desc(consents.createdAt))
+    .limit(1);
+
+  const hasDataProcessingConsent =
+    dpConsentRows.length > 0 && Boolean(dpConsentRows[0].granted);
+
+  if (!hasDataProcessingConsent) {
+    return { sentCount: 0, failedCount: 0 };
+  }
+
+  // Route incident to all active, on-duty responders of the user's organization_zone
+  const assignments = await routeActiveIncidentToResponders(
+    incidentId,
+    db,
+    pushProvider
+  );
+
+  const [owner] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, inc.userId))
+    .limit(1);
+  const ownerFirstName = (owner?.name || 'SAATHI User').trim().split(/\s+/)[0];
+
+  let responderSentCount = 0;
+  let responderFailedCount = 0;
+
+  for (const assign of assignments) {
+    const alreadySentPush = await alreadyDispatchedChannel(
+      db,
+      incidentId,
+      'responder',
+      assign.responderUserId,
+      'push'
+    );
+    if (!alreadySentPush) {
+      const pushRow = await dispatchWithRetry(db, {
+        incidentId,
+        recipientType: 'responder',
+        recipientRef: assign.responderUserId,
+        channel: 'push',
+        sendFn: () =>
+          pushProvider.sendPush({
+            recipientRef: assign.responderUserId,
+            title: `SHAKTI Responder Dispatch (${assign.organizationZone})`,
+            body: `Active SOS alert in ${assign.organizationZone} (${ownerFirstName}). Open Responder Dashboard immediately.`,
+            data: {
+              incident_id: incidentId,
+              organization_zone: assign.organizationZone,
+              responder_id: assign.responderId,
+            },
+          }),
+      });
+      if (pushRow.status === 'sent') responderSentCount++;
+      else responderFailedCount++;
+    }
+  }
+
   const eligibleContacts = await getNotifiableContacts(inc.userId, 'sos', db);
   const firstContactSlice = eligibleContacts.slice(0, 1);
 
-  return dispatchToEligibleContacts(
+  const contactCounts = await dispatchToEligibleContacts(
     incidentId,
     firstContactSlice,
     db,
     providers
   );
+
+  const totalSent = responderSentCount + contactCounts.sentCount;
+  const totalFailed = responderFailedCount + contactCounts.failedCount;
+
+  // Broadcast updated incident (with responder notification rows) to WS subscribers
+  if (responderSentCount > 0 || responderFailedCount > 0) {
+    const realHydrated = await getHydratedIncident(db, incidentId, undefined, {
+      viewerRole: 'system',
+    });
+    broadcastIncidentUpdate(realHydrated);
+  }
+
+  return { sentCount: totalSent, failedCount: totalFailed };
 }
 
 /**

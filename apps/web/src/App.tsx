@@ -10,9 +10,17 @@ import { OnboardingPage } from './pages/OnboardingPage';
 import { ConsentCenterPage } from './pages/ConsentCenterPage';
 import { TrustedCirclePage } from './pages/TrustedCirclePage';
 import { PublicInvitePage } from './pages/PublicInvitePage';
+import { ContactAlertPage } from './pages/ContactAlertPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ResponderDashboardPage } from './pages/ResponderDashboardPage';
+import { SafeJourneyPage } from './pages/SafeJourneyPage';
+import { SafetyReportsPage } from './pages/SafetyReportsPage';
+import { ResourcesPage } from './pages/ResourcesPage';
+import { AdminPage } from './pages/AdminPage';
+import { PolicyPage } from './pages/PolicyPage';
 import { DiscreetTriggersManager } from './components/DiscreetTriggersManager';
-import { useAuthStore } from './store/authStore';
+import { useAuthStore, type UserRole } from './store/authStore';
+import { useTriggerSettingsStore } from './store/triggerSettingsStore';
 import { authApi } from './lib/api';
 import { Spinner } from './components/ui';
 
@@ -25,7 +33,10 @@ const queryClient = new QueryClient({
   },
 });
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const ProtectedRoute: React.FC<{
+  children: React.ReactNode;
+  allowedRoles?: UserRole[];
+}> = ({ children, allowedRoles }) => {
   const { user, isLoading } = useAuthStore();
 
   if (isLoading) {
@@ -40,16 +51,31 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     return <Navigate to="/login" replace />;
   }
 
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/home" replace />;
+  }
+
   return <>{children}</>;
 };
 
 export function AppRoutes() {
   const { i18n } = useTranslation();
   const { setUser, setLoading, darkMode } = useAuthStore();
+  const lowPowerDataSaverMode = useTriggerSettingsStore(
+    (s) => s.lowPowerDataSaverMode
+  );
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
+
+  useEffect(() => {
+    if (lowPowerDataSaverMode) {
+      document.documentElement.setAttribute('data-saver', 'true');
+    } else {
+      document.documentElement.removeAttribute('data-saver');
+    }
+  }, [lowPowerDataSaverMode]);
 
   useEffect(() => {
     let mounted = true;
@@ -85,6 +111,8 @@ export function AppRoutes() {
         <Route path="/" element={<WelcomePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/invite/:token" element={<PublicInvitePage />} />
+      <Route path="/c/:token" element={<ContactAlertPage />} />
+      <Route path="/policy" element={<PolicyPage />} />
       <Route
         path="/home"
         element={
@@ -118,10 +146,58 @@ export function AppRoutes() {
         }
       />
       <Route
+        path="/journeys"
+        element={
+          <ProtectedRoute>
+            <SafeJourneyPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reports"
+        element={
+          <ProtectedRoute>
+            <SafetyReportsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/resources"
+        element={
+          <ProtectedRoute>
+            <ResourcesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/settings"
         element={
           <ProtectedRoute>
             <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/responder"
+        element={
+          <ProtectedRoute allowedRoles={['responder']}>
+            <ResponderDashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/tools"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminPage />
           </ProtectedRoute>
         }
       />

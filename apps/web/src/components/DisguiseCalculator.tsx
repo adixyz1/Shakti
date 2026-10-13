@@ -53,7 +53,7 @@ export const DisguiseCalculator: React.FC<DisguiseCalculatorProps> = ({
   const recordSecretKey = (keyChar: string) => {
     setKeyBuffer((prev) => {
       const next = (prev + keyChar).slice(-32);
-      if (sequenceHash) {
+      if (sequenceHash && keyChar === '=') {
         void verifyDisguiseSequenceCandidate(next, sequenceHash).then(
           (matched) => {
             if (matched) {

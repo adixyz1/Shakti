@@ -12,15 +12,12 @@ export interface OtpProvider {
  */
 export class MockOtpProvider implements OtpProvider {
   public readonly providerName = 'MockOtpProvider';
+  public lastOtpCode: string | null = null;
 
   async sendOtp(phoneE164: string, code: string): Promise<void> {
+    this.lastOtpCode = code;
     logger.info(`[MockOtpProvider] Dispatched 6-digit OTP to ${phoneE164}`);
-    if (config.environment !== 'production') {
-      console.info(
-        `[MockOtpProvider DEV CONSOLE] OTP code generated: ${code} (expires in ${config.otpExpireSeconds}s)`
-      );
-    }
   }
 }
 
-export const defaultOtpProvider: OtpProvider = new MockOtpProvider();
+export const defaultOtpProvider = new MockOtpProvider();

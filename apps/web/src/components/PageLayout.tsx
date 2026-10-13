@@ -9,10 +9,11 @@ import { useTriggerSettingsStore } from '../store/triggerSettingsStore';
 import { authApi } from '../lib/api';
 import { getPracticeModeTarget, triggerSos } from '../lib/sos';
 import {
-  clearOfflineEmergencyContactsCache,
+  clearAllOfflineStateOnLogout,
   flushOfflineAlertQueue,
 } from '../lib/offlineQueue';
 import { PWAInstallButton } from './PWAInstallButton';
+import { DemoModeBanner } from './DemoModeBanner';
 
 const TRIPLE_TAP_WINDOW_MS = 1000;
 
@@ -60,7 +61,7 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
     } catch {
       // ignore network error on logout
     } finally {
-      await clearOfflineEmergencyContactsCache();
+      await clearAllOfflineStateOnLogout();
       setUser(null);
       navigate('/login');
     }
@@ -91,6 +92,13 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:rounded-xl focus:bg-teal-800 focus:text-white focus:font-semibold focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
+      <DemoModeBanner />
       {/* Strict 3-Zone Top Bar Contract */}
       <header className="sticky top-0 z-30 h-16 px-4 md:px-8 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md flex items-center justify-between">
         {/* Zone 1: Single text element Brand wordmark (also default triple-tap zone) */}
@@ -111,7 +119,10 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         </Link>
 
         {/* Zone 2: Clean text navigation links */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-300">
+        <nav
+          aria-label="Primary navigation"
+          className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-700 dark:text-slate-200"
+        >
           <Link
             to={user ? '/home' : '/'}
             className="min-h-[44px] inline-flex items-center hover:text-slate-900 dark:hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap"
@@ -120,6 +131,27 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
           </Link>
           {user && (
             <>
+              <Link
+                to="/journeys"
+                data-testid="nav-journeys-link"
+                className="min-h-[44px] inline-flex items-center hover:text-slate-900 dark:hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap"
+              >
+                {t('journeys.navLink')}
+              </Link>
+              <Link
+                to="/reports"
+                data-testid="nav-reports-link"
+                className="min-h-[44px] inline-flex items-center hover:text-slate-900 dark:hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap"
+              >
+                {t('reports.navLink')}
+              </Link>
+              <Link
+                to="/resources"
+                data-testid="nav-resources-link"
+                className="min-h-[44px] inline-flex items-center hover:text-slate-900 dark:hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap"
+              >
+                {t('resources.navLink')}
+              </Link>
               <Link
                 to="/circle"
                 className="min-h-[44px] inline-flex items-center hover:text-slate-900 dark:hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap"
@@ -138,6 +170,24 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
               >
                 {t('nav.settings')}
               </Link>
+              {user.role === 'responder' && (
+                <Link
+                  to="/responder"
+                  data-testid="nav-responder-link"
+                  className="min-h-[44px] inline-flex items-center font-bold text-teal-800 dark:text-teal-300 hover:underline underline-offset-4 transition-colors whitespace-nowrap"
+                >
+                  {t('responderDashboard.title')}
+                </Link>
+              )}
+              {user.role === 'admin' && (
+                <Link
+                  to="/admin"
+                  data-testid="nav-admin-link"
+                  className="min-h-[44px] inline-flex items-center font-bold text-teal-800 dark:text-teal-300 hover:underline underline-offset-4 transition-colors whitespace-nowrap"
+                >
+                  {t('admin.navLink')}
+                </Link>
+              )}
             </>
           )}
         </nav>
@@ -188,7 +238,11 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 py-8 pb-24 md:pb-12">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 py-8 pb-24 md:pb-12 focus:outline-none"
+      >
         {children}
       </main>
 
@@ -196,11 +250,21 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       <footer
         data-testid="triple-tap-zone-footer"
         onClick={() => recordTapInZone('footer')}
-        className="border-t border-slate-200 dark:border-slate-800 py-6 px-4 md:px-8 text-center text-xs text-slate-500 dark:text-slate-400 select-none"
+        className="border-t border-slate-200 dark:border-slate-800 py-6 px-4 md:px-8 text-center text-xs text-slate-600 dark:text-slate-300 select-none space-y-2"
       >
         <p className="max-w-2xl mx-auto min-h-[44px] flex items-center justify-center">
           {t('app.disclaimer')}
         </p>
+        <div>
+          <Link
+            to="/policy"
+            data-testid="footer-policy-link"
+            onClick={(e) => e.stopPropagation()}
+            className="font-semibold text-teal-700 dark:text-teal-400 underline hover:text-teal-800"
+          >
+            {t('policy.navLink')}
+          </Link>
+        </div>
       </footer>
 
       <ToastContainer />

@@ -47,6 +47,7 @@ describe('SAATHI Phase 2 Full Browser Flow (Web UI <-> Real Express + SQLite DB)
   it('adds a contact, opens invitation link from /api/dev/outbox in unauthenticated window, accepts, sees status change to Accepted, and revokes consent in ledger', async () => {
     // 1. Authenticate user session in Supertest agent
     const userAgent = request.agent(app);
+    userAgent.set('Origin', 'http://localhost:3000');
     const otpReq = await userAgent
       .post('/api/auth/otp/request')
       .send({ phone_e164: '+919000000001' });

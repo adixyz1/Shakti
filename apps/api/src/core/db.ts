@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 import { createClient, type Client } from '@libsql/client';
 import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
@@ -29,7 +30,16 @@ export async function initDatabase(customDatabaseUrl?: string): Promise<AppDatab
   }
 
   const url = customDatabaseUrl || config.databaseUrl;
+  if (url.startsWith('file:') && url !== 'file::memory:') {
+    const filePath = url.slice('file:'.length);
+    const dirPath = path.dirname(path.resolve(process.cwd(), filePath));
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
   const client = createClient({ url });
+  if (url.startsWith('file:') && !url.includes(':memory:')) {
+    await client.execute('PRAGMA busy_timeout = 5000;');
+    await client.execute('PRAGMA journal_mode = WAL;');
+  }
   const db = drizzle(client, { schema });
 
   await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });

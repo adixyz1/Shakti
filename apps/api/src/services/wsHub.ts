@@ -2,10 +2,13 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import cookie from 'cookie';
 import { eq } from 'drizzle-orm';
+import { config } from '../core/config';
 import { getDb } from '../core/db';
 import { ACCESS_COOKIE_NAME, verifyToken } from '../core/security';
 import { incidents, type UserRole } from '../db/schema';
 import type { IncidentDto } from '../schemas/incident';
+import { HttpError } from './authService';
+import { getContactIncidentSummaryByToken } from './contactIncidentTokenService';
 import { getHydratedIncident } from './incidentService';
 
 export interface WsClientMeta {
@@ -92,6 +95,13 @@ export function maskIncidentForOwner(incident: IncidentDto): IncidentDto {
   const maskedEvents = incident.events
     ? incident.events
         .filter((e) => {
+          if (
+            e.actor_type === 'contact' ||
+            e.actor_type === 'responder' ||
+            e.actor_type === 'system'
+          ) {
+            return false;
+          }
           if (cancelEvent && e.created_at > cancelEvent.created_at) {
             return false;
           }
@@ -99,14 +109,33 @@ export function maskIncidentForOwner(incident: IncidentDto): IncidentDto {
         })
         .map((e) => {
           if (e.note?.includes('Duress PIN supplied')) {
+            const customNoteMatch = e.note.match(
+              /^Duress PIN supplied during cancel window \((.*)\); incident kept active silently$/
+            );
             return {
               ...e,
               to_status: 'CANCELLED' as const,
-              note: 'Cancelled by user within cancel window',
+              note: customNoteMatch
+                ? customNoteMatch[1]
+                : 'Cancelled by user within cancel window',
             };
           }
           return e;
         })
+    : undefined;
+
+  const maskedLocations = incident.locations
+    ? incident.locations
+        .filter((loc) => {
+          if (cancelEvent && loc.captured_at > cancelEvent.created_at) {
+            return false;
+          }
+          return true;
+        })
+        .map((loc) => ({
+          ...loc,
+          expires_at: closedAt,
+        }))
     : undefined;
 
   return {
@@ -118,6 +147,7 @@ export function maskIncidentForOwner(incident: IncidentDto): IncidentDto {
     needs_user_action: false,
     escalation_stage: 0,
     ...(maskedEvents ? { events: maskedEvents } : {}),
+    ...(maskedLocations ? { locations: maskedLocations } : {}),
     ...(incident.notifications ? { notifications: [] } : {}),
   };
 }
@@ -177,12 +207,50 @@ export function broadcastIncidentUpdate(realIncident: IncidentDto): void {
 }
 
 const INCIDENT_WS_REGEX = /^\/(?:api\/)?ws\/incidents\/([^/?#]+)$/;
+const CONTACT_WS_REGEX = /^\/(?:api\/)?ws\/c\/([^/?#]+)$/;
+
+export function isValidWebSocketOrigin(request: http.IncomingMessage): boolean {
+  const originHeader = request.headers.origin;
+  const isProd =
+    process.env.NODE_ENV === 'production' ||
+    process.env.ENVIRONMENT === 'production' ||
+    config.environment === 'production';
+
+  if (typeof originHeader !== 'string' || !originHeader.trim()) {
+    return !isProd;
+  }
+
+  let parsedOrigin: URL;
+  try {
+    parsedOrigin = new URL(originHeader.trim());
+  } catch {
+    return false;
+  }
+
+  const hostHeader = (
+    (typeof request.headers['x-forwarded-host'] === 'string'
+      ? request.headers['x-forwarded-host'].split(',')[0]
+      : request.headers.host) || ''
+  )
+    .trim()
+    .toLowerCase();
+
+  const originHost = parsedOrigin.host.toLowerCase();
+  return Boolean(hostHeader && originHost === hostHeader);
+}
 
 export function attachWebSocketHub(server: http.Server): WebSocketServer {
   const wss = new WebSocketServer({ noServer: true });
 
   server.on('upgrade', async (request, socket, head) => {
     const pathname = request.url ? request.url.split('?')[0] : '';
+
+    // Enforce Origin host check across all WebSocket paths (/ws, /ws/incidents/:id, /ws/c/:token, etc.)
+    if (!isValidWebSocketOrigin(request)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+      return;
+    }
 
     if (pathname === '/ws' || pathname === '/api/ws') {
       wss.handleUpgrade(request, socket, head, (ws) => {
@@ -195,6 +263,43 @@ export function attachWebSocketHub(server: http.Server): WebSocketServer {
           })
         );
       });
+      return;
+    }
+
+    const contactMatch = pathname.match(CONTACT_WS_REGEX);
+    if (contactMatch) {
+      const rawToken = decodeURIComponent(contactMatch[1]);
+      try {
+        const db = getDb();
+        const summary = await getContactIncidentSummaryByToken(db, rawToken, {
+          skipAudit: true,
+        });
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          const meta = registerWebSocketClient(
+            ws,
+            request,
+            summary.incident_id
+          );
+          meta.contactToken = rawToken;
+          ws.send(
+            JSON.stringify({
+              type: 'contact_incident_state',
+              summary,
+              timestamp: new Date().toISOString(),
+            })
+          );
+        });
+      } catch (err) {
+        const status = err instanceof HttpError ? err.status : 403;
+        const statusText =
+          status === 404
+            ? 'Not Found'
+            : status === 410
+              ? 'Gone'
+              : 'Forbidden';
+        socket.write(`HTTP/1.1 ${status} ${statusText}\r\n\r\n`);
+        socket.destroy();
+      }
       return;
     }
 
@@ -251,7 +356,11 @@ export function attachWebSocketHub(server: http.Server): WebSocketServer {
         socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
         socket.destroy();
       }
+      return;
     }
+
+    socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+    socket.destroy();
   });
 
   return wss;

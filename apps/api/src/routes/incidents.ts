@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
 import { getDb } from '../core/db';
 import {
   pinSettingsRateLimitMiddleware,
@@ -10,6 +11,7 @@ import {
   locationSampleInputSchema,
   resolveIncidentSchema,
   setEmergencyTypeSchema,
+  submitIncidentRatingSchema,
   updateCancelPinSchema,
   updateCancelWindowSchema,
   updateDuressPinSchema,
@@ -24,6 +26,7 @@ import {
   getHydratedIncident,
   resolveIncidentForUser,
   setIncidentEmergencyType,
+  submitPostIncidentRating,
   updateUserCancelPin,
   updateUserCancelWindow,
   updateUserDuressPin,
@@ -85,17 +88,26 @@ incidentsRouter.get(
   }
 );
 
+const incidentIdParamSchema = z.object({
+  id: z.string().trim().min(1).max(128),
+});
+
 incidentsRouter.get(
   '/incidents/:id',
   requireAuth,
   async (req: Request, res: Response) => {
+    const paramParsed = incidentIdParamSchema.safeParse(req.params);
+    if (!paramParsed.success) {
+      res.status(422).json({ detail: 'Invalid incident ID parameter' });
+      return;
+    }
     try {
       const db = getDb();
       const isResponderOrAdmin =
         req.user!.role === 'responder' || req.user!.role === 'admin';
       const incident = await getHydratedIncident(
         db,
-        String(req.params.id),
+        paramParsed.data.id,
         isResponderOrAdmin ? undefined : req.user!.id,
         { viewerRole: isResponderOrAdmin ? 'responder' : 'owner' }
       );
@@ -117,6 +129,11 @@ incidentsRouter.post(
   '/incidents/:id/cancel',
   requireAuth,
   async (req: Request, res: Response) => {
+    const paramParsed = incidentIdParamSchema.safeParse(req.params);
+    if (!paramParsed.success) {
+      res.status(422).json({ detail: 'Invalid incident ID parameter' });
+      return;
+    }
     const parsed = cancelIncidentSchema.safeParse(req.body || {});
     if (!parsed.success) {
       res.status(422).json({
@@ -130,7 +147,7 @@ incidentsRouter.post(
       const result = await cancelIncidentForUser(
         db,
         req.user!,
-        String(req.params.id),
+        paramParsed.data.id,
         parsed.data
       );
       res.status(200).json(result);
@@ -148,6 +165,11 @@ incidentsRouter.post(
   '/incidents/:id/location',
   requireAuth,
   async (req: Request, res: Response) => {
+    const paramParsed = incidentIdParamSchema.safeParse(req.params);
+    if (!paramParsed.success) {
+      res.status(422).json({ detail: 'Invalid incident ID parameter' });
+      return;
+    }
     const parsed = locationSampleInputSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(422).json({
@@ -161,7 +183,7 @@ incidentsRouter.post(
       const location = await addIncidentLocationSample(
         db,
         req.user!,
-        String(req.params.id),
+        paramParsed.data.id,
         parsed.data
       );
       res.status(201).json({ location });
@@ -179,6 +201,11 @@ incidentsRouter.post(
   '/incidents/:id/type',
   requireAuth,
   async (req: Request, res: Response) => {
+    const paramParsed = incidentIdParamSchema.safeParse(req.params);
+    if (!paramParsed.success) {
+      res.status(422).json({ detail: 'Invalid incident ID parameter' });
+      return;
+    }
     const parsed = setEmergencyTypeSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(422).json({
@@ -192,7 +219,7 @@ incidentsRouter.post(
       const incident = await setIncidentEmergencyType(
         db,
         req.user!,
-        String(req.params.id),
+        paramParsed.data.id,
         parsed.data.emergency_type
       );
       res.status(200).json({ incident });
@@ -210,6 +237,11 @@ incidentsRouter.post(
   '/incidents/:id/resolve',
   requireAuth,
   async (req: Request, res: Response) => {
+    const paramParsed = incidentIdParamSchema.safeParse(req.params);
+    if (!paramParsed.success) {
+      res.status(422).json({ detail: 'Invalid incident ID parameter' });
+      return;
+    }
     const parsed = resolveIncidentSchema.safeParse(req.body || {});
     if (!parsed.success) {
       res.status(422).json({
@@ -223,7 +255,7 @@ incidentsRouter.post(
       const incident = await resolveIncidentForUser(
         db,
         req.user!,
-        String(req.params.id),
+        paramParsed.data.id,
         parsed.data
       );
       res.status(200).json({ incident });
@@ -233,6 +265,42 @@ incidentsRouter.post(
         return;
       }
       res.status(500).json({ detail: 'Failed to resolve incident' });
+    }
+  }
+);
+
+incidentsRouter.post(
+  '/incidents/:id/rating',
+  requireAuth,
+  async (req: Request, res: Response) => {
+    const paramParsed = incidentIdParamSchema.safeParse(req.params);
+    if (!paramParsed.success) {
+      res.status(422).json({ detail: 'Invalid incident ID parameter' });
+      return;
+    }
+    const parsed = submitIncidentRatingSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      res.status(422).json({
+        detail: parsed.error.issues.map((i) => i.message).join('; '),
+      });
+      return;
+    }
+
+    try {
+      const db = getDb();
+      const rating = await submitPostIncidentRating(
+        db,
+        req.user!,
+        paramParsed.data.id,
+        parsed.data.score
+      );
+      res.status(201).json({ rating });
+    } catch (err) {
+      if (err instanceof HttpError) {
+        res.status(err.status).json({ detail: err.message });
+        return;
+      }
+      res.status(500).json({ detail: 'Failed to submit post-incident rating' });
     }
   }
 );

@@ -16,11 +16,14 @@ import {
   locationSamples,
   notifications,
   OPEN_INCIDENT_STATUSES,
+  postIncidentRatings,
+  TERMINAL_INCIDENT_STATUSES,
   users,
   type IncidentEventRow,
   type IncidentRow,
   type LocationSampleRow,
   type NotificationRow,
+  type PostIncidentRatingRow,
   type UserRow,
 } from '../db/schema';
 import type {
@@ -186,6 +189,7 @@ export async function createOrMergeIncident(
   input: {
     client_request_id: string;
     client_created_at?: string;
+    queued_offline?: boolean;
     location?: {
       lat: number;
       lng: number;
@@ -225,6 +229,8 @@ export async function createOrMergeIncident(
 
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
+  const clientCreatedAt = input.client_created_at || nowIso;
+  const queuedOffline = Boolean(input.queued_offline);
   const sourceTrigger = input.source_trigger || 'button';
   const defaultExpiresAt =
     nowMs + config.locationRetentionDays * 24 * 60 * 60 * 1000;
@@ -265,6 +271,8 @@ export async function createOrMergeIncident(
         status: initialDuplicateStatus,
         emergencyType: input.emergency_type ?? recentOpen.emergencyType ?? null,
         clientRequestId: input.client_request_id,
+        clientCreatedAt,
+        queuedOffline,
         createdAt: nowIso,
         activatedAt: isRealDuress ? null : recentOpen.activatedAt,
         closedAt: isRealDuress ? null : nowIso,
@@ -353,6 +361,8 @@ export async function createOrMergeIncident(
       status: 'TRIGGERED',
       emergencyType: input.emergency_type ?? null,
       clientRequestId: input.client_request_id,
+      clientCreatedAt,
+      queuedOffline,
       createdAt: nowIso,
       activatedAt: null,
       closedAt: null,
@@ -412,7 +422,6 @@ export async function cancelIncidentForUser(
   status: string;
   incident: IncidentDto;
   notifiable_contacts_count: number;
-  _duress_keep_location_active?: boolean;
 }> {
   const [inc] = await db
     .select()
@@ -484,7 +493,9 @@ export async function cancelIncidentForUser(
           toStatus: inc.status,
           actorType: 'user',
           actorId: currentUser.id,
-          note: 'Duress PIN supplied during cancel window; incident kept active silently',
+          note: input.note
+            ? `Duress PIN supplied during cancel window (${input.note}); incident kept active silently`
+            : 'Duress PIN supplied during cancel window; incident kept active silently',
           createdAt: nowIso,
         });
       });
@@ -503,7 +514,6 @@ export async function cancelIncidentForUser(
         status: 'CANCELLED',
         incident: spoofedDto,
         notifiable_contacts_count: spoofedDto.notifiable_contacts_count ?? 0,
-        _duress_keep_location_active: true,
       };
     }
 
@@ -567,6 +577,14 @@ export async function addIncidentLocationSample(
     throw new HttpError(
       400,
       `Cannot record location sample for closed incident in status ${inc.status}.`
+    );
+  }
+
+  const allowLocation = await isLocationCaptureAllowed(db, user.id);
+  if (!allowLocation) {
+    throw new HttpError(
+      403,
+      'Location sharing consent has been revoked.'
     );
   }
 
@@ -853,3 +871,80 @@ export async function updateUserDuressPin(
       : {}),
   };
 }
+
+export interface PostIncidentRatingDto {
+  incident_id: string;
+  score: number;
+  created_at: string;
+}
+
+export async function submitPostIncidentRating(
+  dbInstance: AppDatabase | undefined,
+  user: UserRow,
+  incidentId: string,
+  score: number
+): Promise<PostIncidentRatingDto> {
+  const db = dbInstance || getDb();
+  const parsedScore = Number(score);
+  if (!Number.isInteger(parsedScore) || parsedScore < 1 || parsedScore > 5) {
+    throw new HttpError(422, 'Score must be an integer between 1 and 5.');
+  }
+
+  const [inc] = await db
+    .select()
+    .from(incidents)
+    .where(eq(incidents.id, incidentId))
+    .limit(1);
+
+  if (!inc) {
+    throw new HttpError(404, 'Incident not found.');
+  }
+
+  if (inc.userId !== user.id) {
+    throw new HttpError(
+      403,
+      'Only the incident owner can submit a post-incident rating.'
+    );
+  }
+
+  const isClosed =
+    TERMINAL_INCIDENT_STATUSES.includes(inc.status) || Boolean(inc.closedAt);
+
+  // Allowed only after the incident closes; for duress incidents the owner's masked view
+  // already shows it as closed, so allow rating without changing anything on the incident.
+  if (!isClosed && !inc.isDuress) {
+    throw new HttpError(
+      400,
+      'Incident must be closed before submitting a rating.'
+    );
+  }
+
+  const [existingRating] = await db
+    .select()
+    .from(postIncidentRatings)
+    .where(eq(postIncidentRatings.incidentId, inc.id))
+    .limit(1);
+
+  if (existingRating) {
+    throw new HttpError(
+      409,
+      'A rating has already been submitted for this incident.'
+    );
+  }
+
+  const createdAt = new Date().toISOString();
+  const row: PostIncidentRatingRow = {
+    incidentId: inc.id,
+    score: parsedScore,
+    createdAt,
+  };
+
+  await db.insert(postIncidentRatings).values(row);
+
+  return {
+    incident_id: row.incidentId,
+    score: row.score,
+    created_at: row.createdAt,
+  };
+}
+

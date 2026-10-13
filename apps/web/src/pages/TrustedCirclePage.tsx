@@ -347,9 +347,19 @@ export const TrustedCirclePage: React.FC = () => {
                       {msg.metadata?.invitation_url && (
                         <Link
                           to={msg.metadata.invitation_url}
+                          data-testid={`outbox-invite-link-${msg.id}`}
                           className="min-h-[44px] px-3 inline-flex items-center font-semibold text-teal-700 dark:text-teal-400 underline underline-offset-4"
                         >
                           {t('circle.openInviteLink')}
+                        </Link>
+                      )}
+                      {msg.metadata?.contact_url && (
+                        <Link
+                          to={msg.metadata.contact_url}
+                          data-testid={`outbox-contact-alert-link-${msg.id}`}
+                          className="min-h-[44px] px-3 inline-flex items-center font-semibold text-rose-700 dark:text-rose-400 underline underline-offset-4"
+                        >
+                          Open Emergency Alert Link
                         </Link>
                       )}
                     </div>

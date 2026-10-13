@@ -14,15 +14,20 @@ export interface TriggerSettingsState {
   shakePermissionState: 'prompt' | 'granted' | 'denied';
 
   voiceEnabled: boolean;
-  voiceCodeword: string;
+  /**
+   * Salted PBKDF2-SHA256 hash ("pbkdf2$<iterations>$<saltHex>$<digestHex>$<seqLen>")
+   * of the user's lowercase voice codeword (minimum 6 characters, 200,000 iterations).
+   * There is NO default voice codeword, and the plain codeword is NEVER stored in localStorage.
+   */
+  voiceCodewordHash: string | null;
   voiceConsentGranted: boolean;
 
   disguiseEnabled: boolean;
   disguiseUnlockedSession: boolean;
   /**
-   * Salted SHA-256 hash ("sha256$<saltHex>$<digestHex>$<seqLen>") of the user's
-   * disguise unlock sequence. There is NO default secret sequence, and the plain
-   * sequence is NEVER stored in localStorage.
+   * Salted PBKDF2-SHA256 hash ("pbkdf2$<iterations>$<saltHex>$<digestHex>$<seqLen>")
+   * of the user's disguise unlock sequence (minimum 200,000 iterations).
+   * There is NO default secret sequence, and the plain sequence is NEVER stored in localStorage.
    */
   disguiseSequenceHash: string | null;
 
@@ -36,7 +41,8 @@ export interface TriggerSettingsState {
   setShakeThreshold: (threshold: number) => void;
   setShakePermissionState: (state: 'prompt' | 'granted' | 'denied') => void;
   setVoiceEnabled: (enabled: boolean) => void;
-  setVoiceCodeword: (codeword: string) => void;
+  setVoiceCodewordHash: (hash: string | null) => void;
+  configureVoiceCodeword: (plainCodeword: string) => Promise<string>;
   setVoiceConsentGranted: (granted: boolean) => void;
   setDisguiseEnabled: (enabled: boolean) => void;
   setDisguiseUnlockedSession: (unlocked: boolean) => void;
@@ -56,7 +62,7 @@ interface PersistedSlice {
   shakeEnabled: boolean;
   shakeThreshold: number;
   voiceEnabled: boolean;
-  voiceCodeword: string;
+  voiceCodewordHash: string | null;
   voiceConsentGranted: boolean;
   disguiseEnabled: boolean;
   disguiseSequenceHash: string | null;
@@ -71,12 +77,16 @@ const DEFAULT_PERSISTED: PersistedSlice = {
   shakeEnabled: false,
   shakeThreshold: 25,
   voiceEnabled: false,
-  voiceCodeword: 'saathi help',
+  voiceCodewordHash: null, // NO default voice code word!
   voiceConsentGranted: false,
   disguiseEnabled: false,
   disguiseSequenceHash: null, // NO default secret sequence!
   lowPowerDataSaverMode: false,
 };
+
+export const DISGUISE_PBKDF2_ITERATIONS = 200000;
+export const DISGUISE_MIN_SEQUENCE_LENGTH = 6;
+export const VOICE_MIN_CODEWORD_LENGTH = 6;
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes)
@@ -84,40 +94,59 @@ function bytesToHex(bytes: Uint8Array): string {
     .join('');
 }
 
-async function computeSha256Hex(input: string): Promise<string> {
+function hexToBytes(hex: string): Uint8Array {
+  const clean = hex.trim();
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
+async function computePbkdf2Hex(
+  input: string,
+  saltBytes: Uint8Array,
+  iterations: number = DISGUISE_PBKDF2_ITERATIONS
+): Promise<string> {
   if (
     typeof globalThis.crypto !== 'undefined' &&
     globalThis.crypto.subtle &&
-    typeof globalThis.crypto.subtle.digest === 'function'
+    typeof globalThis.crypto.subtle.importKey === 'function' &&
+    typeof globalThis.crypto.subtle.deriveBits === 'function'
   ) {
     const encoded = new TextEncoder().encode(input);
-    const buf = await globalThis.crypto.subtle.digest('SHA-256', encoded);
-    return bytesToHex(new Uint8Array(buf));
+    const keyMaterial = await globalThis.crypto.subtle.importKey(
+      'raw',
+      encoded,
+      { name: 'PBKDF2' },
+      false,
+      ['deriveBits']
+    );
+    const derivedBits = await globalThis.crypto.subtle.deriveBits(
+      {
+        name: 'PBKDF2',
+        salt: saltBytes,
+        iterations,
+        hash: 'SHA-256',
+      },
+      keyMaterial,
+      256
+    );
+    return bytesToHex(new Uint8Array(derivedBits));
   }
-  // Fallback for environments without Web Crypto subtle
-  let h1 = 0xdeadbeef ^ input.length;
-  let h2 = 0x41c6ce57 ^ input.length;
-  for (let i = 0, ch; i < input.length; i++) {
-    ch = input.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 =
-    Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^
-    Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 =
-    Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^
-    Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return (
-    (h1 >>> 0).toString(16).padStart(8, '0') +
-    (h2 >>> 0).toString(16).padStart(8, '0')
-  );
+  throw new Error('WebCrypto PBKDF2 is required to hash the disguise sequence.');
 }
 
 export async function hashDisguiseSequence(
-  plainSequence: string
+  plainSequence: string,
+  iterations: number = DISGUISE_PBKDF2_ITERATIONS
 ): Promise<string> {
   const normalized = plainSequence.trim();
+  if (normalized.length < DISGUISE_MIN_SEQUENCE_LENGTH) {
+    throw new Error(
+      `Disguise sequence must be at least ${DISGUISE_MIN_SEQUENCE_LENGTH} characters.`
+    );
+  }
   const saltBytes = new Uint8Array(16);
   if (
     typeof globalThis.crypto !== 'undefined' &&
@@ -130,8 +159,13 @@ export async function hashDisguiseSequence(
     }
   }
   const saltHex = bytesToHex(saltBytes);
-  const digestHex = await computeSha256Hex(`${saltHex}:${normalized}`);
-  return `sha256$${saltHex}$${digestHex}$${normalized.length}`;
+  const safeIterations = Math.max(DISGUISE_PBKDF2_ITERATIONS, iterations);
+  const digestHex = await computePbkdf2Hex(
+    normalized,
+    saltBytes,
+    safeIterations
+  );
+  return `pbkdf2$${safeIterations}$${saltHex}$${digestHex}$${normalized.length}`;
 }
 
 export async function verifyDisguiseSequenceCandidate(
@@ -140,12 +174,20 @@ export async function verifyDisguiseSequenceCandidate(
 ): Promise<boolean> {
   if (!storedHash || !candidateBuffer) return false;
   const parts = storedHash.split('$');
-  if (parts.length !== 4 || parts[0] !== 'sha256') return false;
+  if (parts.length !== 5 || parts[0] !== 'pbkdf2') return false;
 
-  const saltHex = parts[1];
-  const expectedDigest = parts[2];
-  const seqLen = parseInt(parts[3], 10);
-  if (!saltHex || !expectedDigest || Number.isNaN(seqLen) || seqLen <= 0) {
+  const iterations = parseInt(parts[1], 10);
+  const saltHex = parts[2];
+  const expectedDigest = parts[3];
+  const seqLen = parseInt(parts[4], 10);
+  if (
+    Number.isNaN(iterations) ||
+    iterations < DISGUISE_PBKDF2_ITERATIONS ||
+    !saltHex ||
+    !expectedDigest ||
+    Number.isNaN(seqLen) ||
+    seqLen < DISGUISE_MIN_SEQUENCE_LENGTH
+  ) {
     return false;
   }
   if (candidateBuffer.length < seqLen) {
@@ -153,8 +195,103 @@ export async function verifyDisguiseSequenceCandidate(
   }
 
   const tail = candidateBuffer.slice(-seqLen);
-  const actualDigest = await computeSha256Hex(`${saltHex}:${tail}`);
+  const saltBytes = hexToBytes(saltHex);
+  const actualDigest = await computePbkdf2Hex(tail, saltBytes, iterations);
   return actualDigest === expectedDigest;
+}
+
+export async function hashVoiceCodeword(
+  plainCodeword: string,
+  iterations: number = DISGUISE_PBKDF2_ITERATIONS
+): Promise<string> {
+  const normalized = plainCodeword.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (normalized.length < VOICE_MIN_CODEWORD_LENGTH) {
+    throw new Error(
+      `Voice codeword must be at least ${VOICE_MIN_CODEWORD_LENGTH} characters.`
+    );
+  }
+  const saltBytes = new Uint8Array(16);
+  if (
+    typeof globalThis.crypto !== 'undefined' &&
+    typeof globalThis.crypto.getRandomValues === 'function'
+  ) {
+    globalThis.crypto.getRandomValues(saltBytes);
+  } else {
+    for (let i = 0; i < 16; i++) {
+      saltBytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  const saltHex = bytesToHex(saltBytes);
+  const safeIterations = Math.max(DISGUISE_PBKDF2_ITERATIONS, iterations);
+  const digestHex = await computePbkdf2Hex(
+    normalized,
+    saltBytes,
+    safeIterations
+  );
+  return `pbkdf2$${safeIterations}$${saltHex}$${digestHex}$${normalized.length}`;
+}
+
+export async function verifyVoiceCodewordTranscript(
+  transcript: string,
+  storedHash: string | null
+): Promise<boolean> {
+  if (!storedHash || !transcript) return false;
+  const parts = storedHash.split('$');
+  if (parts.length !== 5 || parts[0] !== 'pbkdf2') return false;
+
+  const iterations = parseInt(parts[1], 10);
+  const saltHex = parts[2];
+  const expectedDigest = parts[3];
+  const seqLen = parseInt(parts[4], 10);
+  if (
+    Number.isNaN(iterations) ||
+    iterations < DISGUISE_PBKDF2_ITERATIONS ||
+    !saltHex ||
+    !expectedDigest ||
+    Number.isNaN(seqLen) ||
+    seqLen < VOICE_MIN_CODEWORD_LENGTH
+  ) {
+    return false;
+  }
+
+  const normalizedTranscript = transcript
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+  if (normalizedTranscript.length < seqLen) {
+    return false;
+  }
+
+  const saltBytes = hexToBytes(saltHex);
+
+  // Check exact match first
+  if (normalizedTranscript.length === seqLen) {
+    const digest = await computePbkdf2Hex(
+      normalizedTranscript,
+      saltBytes,
+      iterations
+    );
+    return digest === expectedDigest;
+  }
+
+  // Check word-aligned substrings of length seqLen inside the transcript
+  const words = normalizedTranscript.split(' ');
+  for (let start = 0; start < words.length; start++) {
+    let phrase = '';
+    for (let end = start; end < words.length; end++) {
+      phrase = phrase ? `${phrase} ${words[end]}` : words[end];
+      if (phrase.length === seqLen) {
+        const digest = await computePbkdf2Hex(phrase, saltBytes, iterations);
+        if (digest === expectedDigest) {
+          return true;
+        }
+      } else if (phrase.length > seqLen) {
+        break;
+      }
+    }
+  }
+
+  return false;
 }
 
 function loadInitialSettings(): PersistedSlice {
@@ -185,7 +322,7 @@ function savePersistedSettings(state: TriggerSettingsState): void {
       shakeEnabled: state.shakeEnabled,
       shakeThreshold: state.shakeThreshold,
       voiceEnabled: state.voiceEnabled,
-      voiceCodeword: state.voiceCodeword,
+      voiceCodewordHash: state.voiceCodewordHash,
       voiceConsentGranted: state.voiceConsentGranted,
       disguiseEnabled: state.disguiseEnabled,
       disguiseSequenceHash: state.disguiseSequenceHash,
@@ -232,12 +369,28 @@ export const useTriggerSettingsStore = create<TriggerSettingsState>((set, get) =
     set({ shakePermissionState });
   },
   setVoiceEnabled: (voiceEnabled) => {
+    // Cannot enable voice trigger unless a salted codeword hash has been configured
+    if (voiceEnabled && !get().voiceCodewordHash) {
+      return;
+    }
     set({ voiceEnabled });
     savePersistedSettings(get());
   },
-  setVoiceCodeword: (voiceCodeword) => {
-    set({ voiceCodeword });
+  setVoiceCodewordHash: (voiceCodewordHash) => {
+    set({
+      voiceCodewordHash,
+      ...(voiceCodewordHash === null ? { voiceEnabled: false } : {}),
+    });
     savePersistedSettings(get());
+  },
+  configureVoiceCodeword: async (plainCodeword: string) => {
+    const hash = await hashVoiceCodeword(plainCodeword);
+    set({
+      voiceCodewordHash: hash,
+      voiceEnabled: true,
+    });
+    savePersistedSettings(get());
+    return hash;
   },
   setVoiceConsentGranted: (voiceConsentGranted) => {
     set({ voiceConsentGranted });

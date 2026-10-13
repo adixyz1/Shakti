@@ -24,6 +24,14 @@ export const otpVerifySchema = z.object({
 export const updateMeSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
   language: z.enum(['en', 'hi']).optional(),
+  organization: z.string().trim().min(1).max(100).optional(),
+  organization_zone: z.string().trim().min(1).max(100).optional(),
+});
+
+export const deleteAccountSchema = z.object({
+  confirmation: z.string().optional().default(''),
+  otp_code: z.string().optional(),
+  cancel_pin: z.string().optional(),
 });
 
 export interface UserResponseDto {
@@ -32,6 +40,8 @@ export interface UserResponseDto {
   name: string;
   role: 'user' | 'responder' | 'admin';
   language: 'en' | 'hi';
+  organization: string;
+  organization_zone: string;
   cancel_window_seconds: number;
   has_cancel_pin: boolean;
   has_duress_pin: boolean;

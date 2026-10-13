@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "SAATHI — Safety Assistance & Alert Technology",
-  "short_name": "SAATHI",
+  "name": "SHAKTI — Safety Assistance & Alert Technology",
+  "short_name": "SHAKTI",
   "description": "An installable, offline-first, consent-driven emergency safety and intervention PWA for women.",
   "start_url": "/",
   "scope": "/",

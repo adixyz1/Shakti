@@ -8,6 +8,7 @@ export interface UserProfile {
   name: string;
   role: UserRole;
   language: 'en' | 'hi';
+  organization_zone?: string;
   created_at: string;
   cancel_window_seconds?: number;
   has_cancel_pin?: boolean;
