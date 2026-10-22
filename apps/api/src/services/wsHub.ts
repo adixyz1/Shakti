@@ -1,5 +1,6 @@
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
+// @ts-ignore
 import cookie from 'cookie';
 import { eq } from 'drizzle-orm';
 import { config } from '../core/config';
@@ -134,7 +135,7 @@ export function maskIncidentForOwner(incident: IncidentDto): IncidentDto {
         })
         .map((loc) => ({
           ...loc,
-          expires_at: closedAt,
+          expires_at: Date.parse(closedAt),
         }))
     : undefined;
 
@@ -227,16 +228,31 @@ export function isValidWebSocketOrigin(request: http.IncomingMessage): boolean {
     return false;
   }
 
-  const hostHeader = (
-    (typeof request.headers['x-forwarded-host'] === 'string'
-      ? request.headers['x-forwarded-host'].split(',')[0]
-      : request.headers.host) || ''
+  const trustProxy =
+    (process.env.TRUST_PROXY || '').trim() === '1' ||
+    (process.env.TRUST_PROXY || '').trim().toLowerCase() === 'true';
+
+  const rawForwardedHost =
+    typeof request.headers['x-forwarded-host'] === 'string'
+      ? request.headers['x-forwarded-host'].split(',')[0].trim()
+      : undefined;
+
+  const effectiveHost = (
+    (trustProxy && rawForwardedHost ? rawForwardedHost : request.headers.host) || ''
   )
     .trim()
     .toLowerCase();
 
   const originHost = parsedOrigin.host.toLowerCase();
-  return Boolean(hostHeader && originHost === hostHeader);
+  const originBase = `${parsedOrigin.protocol}//${parsedOrigin.host}`.toLowerCase();
+  const allowedOrigins = new Set(
+    config.corsOrigins.map((o) => o.trim().toLowerCase())
+  );
+
+  return Boolean(
+    (effectiveHost && originHost === effectiveHost) ||
+    allowedOrigins.has(originBase)
+  );
 }
 
 export function attachWebSocketHub(server: http.Server): WebSocketServer {

@@ -18,6 +18,21 @@ function normalizeSqliteUrl(rawUrl: string | undefined): string {
 
 export const DEFAULT_DEV_JWT_SECRET =
   'saathi-dev-secret-key-change-in-production';
+export const DEFAULT_DEV_HMAC_SECRET =
+  'saathi-dev-secret-key-change-in-production';
+
+export function isBuiltinOrInsecureSecret(secret: string): boolean {
+  const s = (secret || '').trim().toLowerCase();
+  if (
+    s === DEFAULT_DEV_JWT_SECRET.toLowerCase() ||
+    s.includes('do-not-use-in-prod') ||
+    s.includes('change-in-production') ||
+    s.includes('dev-secret')
+  ) {
+    return true;
+  }
+  return false;
+}
 
 export function assertValidDemoModeConfiguration(
   env: NodeJS.ProcessEnv = process.env
@@ -36,46 +51,47 @@ export function assertValidProductionConfiguration(
 ): void {
   assertValidDemoModeConfiguration(env);
 
-  const nodeEnv = (env.NODE_ENV || env.ENVIRONMENT || 'development').trim();
-  if (nodeEnv !== 'production') {
-    return;
+  const nodeEnv = (env.NODE_ENV || env.ENVIRONMENT || 'development').trim().toLowerCase();
+  const isDemo = (env.DEMO_MODE || '').trim().toLowerCase() === 'true';
+  const isCookieSecure =
+    (env.COOKIE_SECURE || '').trim().toLowerCase() === 'true' ||
+    (env.COOKIE_SECURE || '').trim() === '1';
+  const isProd = nodeEnv === 'production';
+
+  const requiresStrongSecrets = isProd || isDemo || isCookieSecure;
+
+  if (requiresStrongSecrets) {
+    const rawJwt = env.JWT_SECRET_KEY !== undefined ? env.JWT_SECRET_KEY : env.JWT_SECRET;
+    const jwtSecret = (rawJwt || '').trim();
+
+    if (!jwtSecret || jwtSecret.length < 32 || isBuiltinOrInsecureSecret(jwtSecret)) {
+      throw new Error(
+        'FATAL: JWT_SECRET / JWT_SECRET_KEY is missing, uses the default development secret, or is shorter than 32 characters.'
+      );
+    }
+
+    const rawHmac = env.HMAC_SECRET_KEY !== undefined ? env.HMAC_SECRET_KEY : env.HMAC_SECRET;
+    const hmacSecret = (rawHmac !== undefined ? rawHmac : jwtSecret).trim();
+
+    if (!hmacSecret || hmacSecret.length < 32 || isBuiltinOrInsecureSecret(hmacSecret)) {
+      throw new Error(
+        'FATAL: HMAC_SECRET / HMAC_SECRET_KEY is missing, uses the default development secret, or is shorter than 32 characters.'
+      );
+    }
   }
 
-  const jwtSecret = (env.JWT_SECRET_KEY || '').trim();
-  if (
-    !jwtSecret ||
-    jwtSecret === DEFAULT_DEV_JWT_SECRET ||
-    jwtSecret.length < 32
-  ) {
-    throw new Error(
-      'FATAL: JWT_SECRET_KEY is missing, uses the default development secret, or is shorter than 32 characters when NODE_ENV=production.'
-    );
-  }
-
-  const hmacSecret =
-    env.HMAC_SECRET_KEY !== undefined
-      ? env.HMAC_SECRET_KEY.trim()
-      : jwtSecret;
-  if (
-    !hmacSecret ||
-    hmacSecret === DEFAULT_DEV_JWT_SECRET ||
-    hmacSecret.length < 32
-  ) {
-    throw new Error(
-      'FATAL: HMAC_SECRET_KEY is missing, uses the default development secret, or is shorter than 32 characters when NODE_ENV=production.'
-    );
-  }
-
-  const otpProviderName = (env.OTP_PROVIDER || 'mock').trim().toLowerCase();
-  const allowMockProviders =
-    (env.ALLOW_MOCK_PROVIDERS || '').trim().toLowerCase() === 'true';
-  if (
-    (otpProviderName === 'mock' || otpProviderName === 'mockotpprovider') &&
-    !allowMockProviders
-  ) {
-    throw new Error(
-      'FATAL: MockOtpProvider is active in NODE_ENV=production without explicit ALLOW_MOCK_PROVIDERS=true.'
-    );
+  if (isProd) {
+    const otpProviderName = (env.OTP_PROVIDER || 'mock').trim().toLowerCase();
+    const allowMockProviders =
+      (env.ALLOW_MOCK_PROVIDERS || '').trim().toLowerCase() === 'true';
+    if (
+      (otpProviderName === 'mock' || otpProviderName === 'mockotpprovider') &&
+      !allowMockProviders
+    ) {
+      throw new Error(
+        'FATAL: MockOtpProvider is active in NODE_ENV=production without explicit ALLOW_MOCK_PROVIDERS=true.'
+      );
+    }
   }
 }
 
@@ -90,13 +106,29 @@ export function isDemoModeEnabled(overrideDemoMode?: boolean): boolean {
   return Boolean(config.demoMode);
 }
 
+export function isTrustProxyEnabled(): boolean {
+  const tp = (process.env.TRUST_PROXY || '').trim().toLowerCase();
+  return tp === '1' || tp === 'true';
+}
+
+export function isCookieSecure(): boolean {
+  const cs = (process.env.COOKIE_SECURE || '').trim().toLowerCase();
+  if (cs === 'true' || cs === '1') {
+    return true;
+  }
+  const nodeEnv = (process.env.NODE_ENV || process.env.ENVIRONMENT || config?.environment || 'development').trim();
+  return nodeEnv === 'production';
+}
+
 export const config = {
   environment: process.env.ENVIRONMENT || process.env.NODE_ENV || 'development',
   demoMode: (process.env.DEMO_MODE || '').trim().toLowerCase() === 'true',
-  port: Number(process.env.SAATHI_PORT || 3000),
+  port: Number(process.env.PORT || process.env.SAATHI_PORT || 3000),
   databaseUrl: normalizeSqliteUrl(process.env.DATABASE_URL),
   jwtSecretKey:
-    process.env.JWT_SECRET_KEY || 'saathi-dev-secret-key-change-in-production',
+    process.env.JWT_SECRET_KEY ||
+    process.env.JWT_SECRET ||
+    'saathi-dev-secret-key-change-in-production',
   jwtAlgorithm: 'HS256' as const,
   accessTokenExpireMinutes: Number(process.env.ACCESS_TOKEN_EXPIRE_MINUTES || 15),
   refreshTokenExpireDays: Number(process.env.REFRESH_TOKEN_EXPIRE_DAYS || 7),

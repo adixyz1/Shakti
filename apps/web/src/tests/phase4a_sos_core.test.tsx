@@ -1,3 +1,4 @@
+import { defaultOtpProvider } from '../../../../apps/api/src/providers/otp';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import crypto from 'crypto';
@@ -69,6 +70,7 @@ function makeIncident(overrides: Partial<IncidentDto> = {}): IncidentDto {
 
 describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
   beforeEach(async () => {
+    process.env.DEMO_MODE = 'true';
     vi.restoreAllMocks();
     await i18n.changeLanguage('en');
 
@@ -556,7 +558,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
         .send({ phone_e164: '+919000000001' });
       const verifyRes = await agent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000001',
-        code: otpReq.body.dev_mock_hint,
+        code: (otpReq.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "123456"),
       });
       const setCookieHeader = verifyRes.headers['set-cookie'];
       const cookieStr = Array.isArray(setCookieHeader)
@@ -725,7 +727,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
         .send({ phone_e164: '+919000000001' });
       const verifyRes = await agent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000001',
-        code: otpReq.body.dev_mock_hint,
+        code: (otpReq.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "123456"),
       });
       const setCookieHeader = verifyRes.headers['set-cookie'];
       const cookieStr = Array.isArray(setCookieHeader)
@@ -740,7 +742,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
         .send({ phone_e164: '+919000000002' });
       await responderAgent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000002',
-        code: respOtp.body.dev_mock_hint,
+        code: (respOtp.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "123456"),
       });
 
       await agent
@@ -907,7 +909,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
         .send({ phone_e164: '+919000000001' });
       const verifyRes = await agent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000001',
-        code: otpReq.body.dev_mock_hint,
+        code: (otpReq.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "123456"),
       });
 
       // Grant location consent and configure cancel PIN (1111) + duress PIN (9999)
@@ -1074,7 +1076,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
         .send({ phone_e164: '+919000000001' });
       await agent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000001',
-        code: otpReq.body.dev_mock_hint,
+        code: (otpReq.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "123456"),
       });
 
       const meBefore = await agent.get('/api/me');
@@ -1133,7 +1135,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
         .send({ phone_e164: '+919000000001' });
       await agent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000001',
-        code: otpReq.body.dev_mock_hint,
+        code: (otpReq.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "123456"),
       });
 
       await agent
@@ -1228,7 +1230,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
         .send({ phone_e164: '+919000000001' });
       await agent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000001',
-        code: otpReq.body.dev_mock_hint,
+        code: (otpReq.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "123456"),
       });
 
       const responderAgent = request.agent(app);
@@ -1238,7 +1240,7 @@ describe('SAATHI Phase 4A Web Tests (SOS Core Experience)', () => {
         .send({ phone_e164: '+919000000002' });
       await responderAgent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000002',
-        code: respOtp.body.dev_mock_hint,
+        code: (respOtp.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "123456"),
       });
 
       await agent

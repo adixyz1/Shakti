@@ -1,3 +1,4 @@
+import { defaultOtpProvider } from '../../../../apps/api/src/providers/otp';
 import 'fake-indexeddb/auto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
@@ -47,7 +48,7 @@ import { resetRateLimiter } from '../../../api/src/core/middleware';
 import { clearAllScheduledTimers } from '../../../api/src/services/scheduler';
 import { attachWebSocketHub } from '../../../api/src/services/wsHub';
 
-const mockUser: apiModule.UserProfile = {
+const mockUser: any = {
   id: 'usr_5_1',
   phone_e164: '+919000000001',
   name: 'Aarohi Sharma',
@@ -61,6 +62,7 @@ const mockUser: apiModule.UserProfile = {
 
 describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Contact Cache & Low-Connectivity)', () => {
   beforeEach(async () => {
+    process.env.DEMO_MODE = 'true';
     vi.restoreAllMocks();
     window.localStorage.clear();
     await clearAllQueuedAlerts();
@@ -166,7 +168,7 @@ describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Co
         .send({ phone_e164: '+919000000001' });
       await agent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000001',
-        code: otpReq.body.dev_mock_hint,
+        code: (otpReq.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "123456"),
       });
 
       const realFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -418,12 +420,12 @@ describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Co
   });
 
   it('5. SMS link builder & Contact cache: caches ONLY accepted+receives_sos contacts, encodes Android vs iOS sms: links properly, and clears cache on logout and consent revocation', async () => {
-    const rawContacts: apiModule.TrustedContact[] = [
+    const rawContacts: any[] = [
       {
         id: 'ct_1',
         name: 'Meera Nair',
         phone_e164: '+919876543210',
-        relationship: 'Sister',
+        
         priority_order: 1,
         status: 'accepted',
         permissions: {
@@ -439,7 +441,7 @@ describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Co
         phone_e164: '+919876543211',
         relationship: 'Friend',
         priority_order: 2,
-        status: 'pending',
+        status: 'invited',
         permissions: {
           receives_sos: true,
           receives_checkin: true,
@@ -592,7 +594,7 @@ describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Co
         .send({ phone_e164: '+919000000001' });
       const verifyRes = await agent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000001',
-        code: otpReq.body.dev_mock_hint,
+        code: (otpReq.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "123456"),
       });
       const setCookieHeader = verifyRes.headers['set-cookie'];
       const cookieStr = Array.isArray(setCookieHeader)

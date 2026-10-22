@@ -74,8 +74,9 @@ describe('SAATHI Phase 7C Web UI Tests — Resources Directory & Weekly Safety P
         name: 'Asha Sharma',
         role: 'user',
         language: 'en',
-        is_verified: true,
-        onboarding_completed: true,
+        created_at: new Date().toISOString(),
+        
+        
       },
       isLoading: false,
       darkMode: false,
@@ -92,8 +93,10 @@ describe('SAATHI Phase 7C Web UI Tests — Resources Directory & Weekly Safety P
         data_processing: true,
         location: false,
         notifications: true,
-        audio_evidence: false,
-        anonymous_analytics: false,
+        camera: false,
+        microphone: false,
+        
+        
       },
       history: [],
     });
@@ -195,6 +198,7 @@ describe('SAATHI Phase 7C Web UI Tests — Resources Directory & Weekly Safety P
   it('2. Safety Pulse Card on Home: shown when eligible, supports two questions + anonymous submit or skip/dismiss, and is NEVER shown during an active alert or in disguise mode', async () => {
     vi.spyOn(incidentsApi, 'getActiveIncident').mockResolvedValue({
       incident: null,
+      notifiable_contacts_count: 0,
     });
     vi.spyOn(resourcesPulseApi, 'getPulseStatus').mockResolvedValue({
       should_prompt: true,
@@ -280,7 +284,6 @@ describe('SAATHI Phase 7C Web UI Tests — Resources Directory & Weekly Safety P
         id: 'inc_active_1',
         user_id: 'u_demo_1',
         status: 'ACTIVE',
-        trigger_mode: 'hold_button',
         emergency_type: null,
         countdown_ends_at: null,
         auto_expire_minutes: 60,
@@ -288,7 +291,8 @@ describe('SAATHI Phase 7C Web UI Tests — Resources Directory & Weekly Safety P
         resolved_at: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      },
+      } as any,
+      notifiable_contacts_count: 0,
     });
 
     const { unmount: unmountActiveAlert } = render(
@@ -308,6 +312,7 @@ describe('SAATHI Phase 7C Web UI Tests — Resources Directory & Weekly Safety P
     // Test hidden while disguise mode is on
     vi.spyOn(incidentsApi, 'getActiveIncident').mockResolvedValue({
       incident: null,
+      notifiable_contacts_count: 0,
     });
     useTriggerSettingsStore.setState({
       disguiseEnabled: true,

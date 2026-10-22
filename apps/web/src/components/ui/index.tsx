@@ -106,7 +106,7 @@ export const Card: React.FC<
 );
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label: string;
+  label?: string;
   error?: string;
 }
 
@@ -117,15 +117,17 @@ export const Input: React.FC<InputProps> = ({
   className = '',
   ...props
 }) => {
-  const inputId = id || `input-${label.toLowerCase().replace(/\s+/g, '-')}`;
+  const inputId = id || (label ? `input-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined);
   return (
     <div className="w-full space-y-1.5">
-      <label
-        htmlFor={inputId}
-        className="block text-sm font-medium text-slate-800 dark:text-slate-200"
-      >
-        {label}
-      </label>
+      {label && (
+        <label
+          htmlFor={inputId}
+          className="block text-sm font-medium text-slate-800 dark:text-slate-200"
+        >
+          {label}
+        </label>
+      )}
       <input
         id={inputId}
         className={`w-full min-h-[48px] px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border ${

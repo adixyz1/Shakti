@@ -1,3 +1,4 @@
+import { defaultOtpProvider } from '../providers/otp';
 import crypto from 'crypto';
 import fs from 'fs';
 import http from 'http';
@@ -59,7 +60,7 @@ describe('SAATHI Phase 3A API Tests (SOS Engine Core, State Machine, Duress, Sch
       .send({ phone_e164: phone });
     const verifyRes = await agent
       .post('/api/auth/otp/verify')
-      .send({ phone_e164: phone, code: otpRes.body.dev_mock_hint });
+      .send({ phone_e164: phone, code: (otpRes.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "000000")});
     const setCookieHeader = verifyRes.headers['set-cookie'];
     return {
       agent,
@@ -79,7 +80,7 @@ describe('SAATHI Phase 3A API Tests (SOS Engine Core, State Machine, Duress, Sch
       .send({ phone_e164: phone });
     const verifyRes = await agent
       .post('/api/auth/otp/verify')
-      .send({ phone_e164: phone, code: otpRes.body.dev_mock_hint });
+      .send({ phone_e164: phone, code: (otpRes.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "000000")});
     const setCookieHeader = verifyRes.headers['set-cookie'];
     return {
       agent,

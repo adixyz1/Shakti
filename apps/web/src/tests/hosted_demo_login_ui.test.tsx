@@ -10,7 +10,7 @@ import i18n from '../i18n';
 
 describe('Hosted-Demo Login UI (Demo Mode OTP Hint)', () => {
   beforeEach(async () => {
-    cleanup();
+        cleanup();
     useAuthStore.setState({ user: null, isLoading: false, toasts: [] });
     await i18n.changeLanguage('en');
     vi.restoreAllMocks();

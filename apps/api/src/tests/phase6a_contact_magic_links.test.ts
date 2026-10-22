@@ -1,3 +1,4 @@
+import { defaultOtpProvider } from '../providers/otp';
 import crypto from 'crypto';
 import fs from 'fs';
 import http from 'http';
@@ -76,7 +77,7 @@ describe('SAATHI Phase 6A API Tests (Trusted Contact Magic Links, Scoping, Revoc
       .send({ phone_e164: phoneE164 });
     const verifyRes = await agent.post('/api/auth/otp/verify').send({
       phone_e164: phoneE164,
-      code: otpReq.body.dev_mock_hint,
+      code: (otpReq.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "000000"),
     });
     const setCookieHeader = verifyRes.headers['set-cookie'];
     const cookieStr = Array.isArray(setCookieHeader)

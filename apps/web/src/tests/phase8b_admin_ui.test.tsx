@@ -34,7 +34,7 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   };
 }
 
-const ADMIN_USER: UserProfile = {
+const ADMIN_USER: any = {
   id: 'usr_admin_1',
   phone_e164: '+919000000003',
   name: 'Meera Nair',
@@ -47,7 +47,7 @@ const ADMIN_USER: UserProfile = {
   created_at: '2026-10-01T00:00:00.000Z',
 };
 
-const NORMAL_USER: UserProfile = {
+const NORMAL_USER: any = {
   id: 'usr_user_1',
   phone_e164: '+919000000001',
   name: 'Aarohi Sharma',

@@ -384,8 +384,7 @@ export async function dispatchInitialActiveNotifications(
   // Route incident to all active, on-duty responders of the user's organization_zone
   const assignments = await routeActiveIncidentToResponders(
     incidentId,
-    db,
-    pushProvider
+    db
   );
 
   const [owner] = await db

@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx apps/api/server.ts",
+    "dev": "PORT=3000 tsx server.ts",
     "start": "tsx server.ts",
     "start:prod": "npm run build && NODE_ENV=production tsx apps/api/server.ts",
     "test:offline:prod": "npm run build && tsx scripts/verify_offline_prod.ts",

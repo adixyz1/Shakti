@@ -93,6 +93,7 @@ const LeafletLatestPointMap: React.FC<{
   return (
     <div
       ref={containerRef}
+      role="region"
       data-testid="contact-leaflet-map"
       aria-label={`Map showing latest location (${lat.toFixed(5)}, ${lng.toFixed(5)})`}
       className="w-full h-64 rounded-2xl border border-slate-300 dark:border-slate-700 overflow-hidden bg-slate-100 dark:bg-slate-900"

@@ -1,3 +1,4 @@
+import { defaultOtpProvider } from '../providers/otp';
 import crypto from 'crypto';
 import fs from 'fs';
 import http from 'http';
@@ -73,7 +74,7 @@ describe('SAATHI Phase 3B API Tests (Notifications, Escalation, Realtime WebSock
       .send({ phone_e164: phone });
     const verifyRes = await agent
       .post('/api/auth/otp/verify')
-      .send({ phone_e164: phone, code: otpRes.body.dev_mock_hint, name });
+      .send({ phone_e164: phone, code: (otpRes.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "000000"), name });
     const setCookieHeader = verifyRes.headers['set-cookie'];
     return {
       agent,

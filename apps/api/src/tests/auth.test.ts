@@ -16,7 +16,11 @@ describe('SAATHI Phase 1 API Tests (Express + Drizzle + Real SQLite)', () => {
   let tempDbPath: string;
   const app = createApp();
 
+  const origDemoMode = process.env.DEMO_MODE;
+  const origAdminHint = process.env.DEMO_ADMIN_HINT;
   beforeEach(async () => {
+    process.env.DEMO_MODE = 'true';
+    process.env.DEMO_ADMIN_HINT = 'true';
     resetRateLimiter();
     tempDbPath = path.join(os.tmpdir(), `saathi-test-${crypto.randomUUID()}.db`);
     const db = await initDatabase(`file:${tempDbPath}`);
@@ -24,6 +28,16 @@ describe('SAATHI Phase 1 API Tests (Express + Drizzle + Real SQLite)', () => {
   });
 
   afterEach(async () => {
+    if (origDemoMode === undefined) {
+      delete process.env.DEMO_MODE;
+    } else {
+      process.env.DEMO_MODE = origDemoMode;
+    }
+    if (origAdminHint === undefined) {
+      delete process.env.DEMO_ADMIN_HINT;
+    } else {
+      process.env.DEMO_ADMIN_HINT = origAdminHint;
+    }
     await closeDatabase();
     for (const suffix of ['', '-wal', '-shm', '-journal']) {
       const candidate = `${tempDbPath}${suffix}`;

@@ -147,7 +147,6 @@ apiRouter.patch('/me', requireAuth, async (req: Request, res: Response) => {
   const nextOrgZone =
     parsed.data.organization ??
     parsed.data.organization_zone ??
-    currentUser.organization ??
     currentUser.organizationZone;
 
   const db = getDb();
@@ -156,7 +155,6 @@ apiRouter.patch('/me', requireAuth, async (req: Request, res: Response) => {
     .set({
       name: nextName,
       language: nextLang,
-      organization: nextOrgZone,
       organizationZone: nextOrgZone,
     })
     .where(eq(users.id, currentUser.id));

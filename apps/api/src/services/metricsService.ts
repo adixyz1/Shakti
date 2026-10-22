@@ -125,7 +125,7 @@ export function isIncidentAuditChainValid(
       // Self-loop metadata event (e.g., emergency_type set, duress note, operational note)
       continue;
     }
-    const allowed = ALLOWED_TRANSITIONS[currentStatus] || [];
+    const allowed: readonly IncidentStatus[] = ALLOWED_TRANSITIONS[currentStatus] || [];
     if (!allowed.includes(ev.toStatus)) {
       return false;
     }

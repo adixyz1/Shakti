@@ -307,6 +307,7 @@ describe('SAATHI Phase 6A Web Tests (Trusted Contact Page, Duress Awareness, Dat
       // Authenticate Owner (Window 1 session)
       const ownerAgent = request.agent(baseUrl);
       ownerAgent.set('Origin', baseUrl);
+      process.env.DEMO_MODE = 'true';
       const otpReq = await ownerAgent
         .post('/api/auth/otp/request')
         .send({ phone_e164: '+919000000001' });

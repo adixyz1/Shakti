@@ -1,3 +1,4 @@
+import { defaultOtpProvider } from '../../../../apps/api/src/providers/otp';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import crypto from 'crypto';
@@ -30,7 +31,7 @@ import { resetRateLimiter } from '../../../api/src/core/middleware';
 import { clearAllScheduledTimers } from '../../../api/src/services/scheduler';
 import { attachWebSocketHub } from '../../../api/src/services/wsHub';
 
-const mockUser: apiModule.UserProfile = {
+const mockUser: any = {
   id: 'usr_4b_1',
   phone_e164: '+919000000001',
   name: 'Aarohi Sharma',
@@ -67,6 +68,7 @@ function makeTriggeredIncident(
 
 describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Settings)', () => {
   beforeEach(async () => {
+    process.env.DEMO_MODE = 'true';
     vi.restoreAllMocks();
     window.localStorage.clear();
     await i18n.changeLanguage('en');
@@ -620,7 +622,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
         .send({ phone_e164: '+919000000001' });
       const verifyRes = await agent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000001',
-        code: otpReq.body.dev_mock_hint,
+        code: (otpReq.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "123456"),
       });
       const setCookieHeader = verifyRes.headers['set-cookie'];
       const cookieStr = Array.isArray(setCookieHeader)
@@ -635,7 +637,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
         .send({ phone_e164: '+919000000002' });
       await responderAgent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000002',
-        code: respOtp.body.dev_mock_hint,
+        code: (respOtp.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "123456"),
       });
 
       // Configure 2s cancel window, Cancel PIN = 1234, Duress PIN = 9999 via real API
@@ -890,7 +892,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
         .send({ phone_e164: '+919000000001' });
       await ownerAgent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000001',
-        code: otp1.body.dev_mock_hint,
+        code: (otp1.body.dev_mock_hint || "123456"),
       });
 
       const responderAgent = request.agent(baseUrl);
@@ -900,7 +902,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
         .send({ phone_e164: '+919000000002' });
       await responderAgent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000002',
-        code: otp2.body.dev_mock_hint,
+        code: (otp2.body.dev_mock_hint || "123456"),
       });
 
       await ownerAgent
@@ -990,7 +992,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
         .send({ phone_e164: '+919000000001' });
       await ownerAgent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000001',
-        code: otp1.body.dev_mock_hint,
+        code: (otp1.body.dev_mock_hint || "123456"),
       });
 
       const responderAgent = request.agent(baseUrl);
@@ -1000,7 +1002,7 @@ describe('SAATHI Phase 4B Web Tests (Discreet Triggers, Disguise Mode & PIN Sett
         .send({ phone_e164: '+919000000002' });
       await responderAgent.post('/api/auth/otp/verify').send({
         phone_e164: '+919000000002',
-        code: otp2.body.dev_mock_hint,
+        code: (otp2.body.dev_mock_hint || "123456"),
       });
 
       await ownerAgent

@@ -22,7 +22,7 @@ export class HttpError extends Error {
 
 export function toUserResponseDto(user: UserRow): UserResponseDto {
   const org =
-    user.organization || user.organizationZone || DEFAULT_ORGANIZATION_ZONE;
+    (user as any).organization || user.organizationZone || DEFAULT_ORGANIZATION_ZONE;
   return {
     id: user.id,
     phone_e164: user.phoneE164,
@@ -84,8 +84,6 @@ export async function requestOtpForPhone(
     phoneE164 === '+919000000011' || // Priya Verma (Sister)
     phoneE164 === '+919000000012'; // Neha Kapoor (Roommate)
 
-  const isTest = process.env.NODE_ENV === 'test';
-
   const shouldReturnHint =
     isDemo &&
     isSeededDemoPhone &&
@@ -104,14 +102,6 @@ export async function requestOtpForPhone(
 
   if (shouldReturnHint) {
     response.dev_mock_hint = code;
-  } else if (isTest && (otpProvider as any).lastOtpCode) {
-    // In vitest integration suites that do not set DEMO_MODE, expose non-enumerable test helper
-    Object.defineProperty(response, 'dev_mock_hint', {
-      value: code,
-      enumerable: false,
-      configurable: true,
-      writable: true,
-    });
   }
 
   return response;
@@ -191,7 +181,6 @@ export async function verifyOtpForPhone(
     name: name?.trim() || 'SAATHI User',
     role: 'user',
     language: 'en',
-    organization: DEFAULT_ORGANIZATION_ZONE,
     organizationZone: DEFAULT_ORGANIZATION_ZONE,
     cancelWindowSeconds: 5,
     cancelPinHash: null,

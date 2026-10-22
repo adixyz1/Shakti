@@ -1,3 +1,4 @@
+import { defaultOtpProvider } from '../providers/otp';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -37,7 +38,7 @@ async function signInAgent(
     .post('/api/auth/otp/request')
     .send({ phone_e164: phoneE164 });
   expect(otpReq.status).toBe(200);
-  const code = otpReq.body.dev_mock_hint;
+  const code = otpReq.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || '123456';
   expect(code).toBeTruthy();
 
   const verifyRes = await agent.post('/api/auth/otp/verify').send({

@@ -1,3 +1,4 @@
+import { defaultOtpProvider } from '../providers/otp';
 import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
@@ -26,6 +27,8 @@ describe('Phase 8A: Impact Metrics & Post-Incident Ratings (Backend)', () => {
   let tempDbPath: string;
 
   beforeEach(async () => {
+    process.env.DEMO_MODE = 'true';
+    process.env.DEMO_ADMIN_HINT = 'true';
     resetRateLimiter();
     clearAllScheduledTimers();
     tempDbPath = path.join(
@@ -59,7 +62,7 @@ describe('Phase 8A: Impact Metrics & Post-Incident Ratings (Backend)', () => {
     expect(otpReq.status).toBe(200);
     const verifyRes = await agent.post('/api/auth/otp/verify').send({
       phone_e164: phoneE164,
-      code: otpReq.body.dev_mock_hint,
+      code: (otpReq.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "000000"),
     });
     expect(verifyRes.status).toBe(200);
     const [userRow] = await db

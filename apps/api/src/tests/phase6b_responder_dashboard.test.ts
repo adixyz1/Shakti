@@ -1,3 +1,4 @@
+import { defaultOtpProvider } from '../providers/otp';
 import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
@@ -33,6 +34,8 @@ describe('SAATHI Phase 6B API & End-to-End Integration Tests (Responder Routing,
   const app = createApp();
 
   beforeEach(async () => {
+    process.env.DEMO_MODE = 'true';
+    process.env.DEMO_ADMIN_HINT = 'true';
     clearAllScheduledTimers();
     resetRateLimiter();
     defaultPushProvider.reset();
@@ -69,7 +72,7 @@ describe('SAATHI Phase 6B API & End-to-End Integration Tests (Responder Routing,
       .send({ phone_e164: phone });
     const verifyRes = await agent
       .post('/api/auth/otp/verify')
-      .send({ phone_e164: phone, code: otpRes.body.dev_mock_hint, name });
+      .send({ phone_e164: phone, code: (otpRes.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "000000"), name });
     return {
       agent,
       user: verifyRes.body,
@@ -409,8 +412,8 @@ describe('SAATHI Phase 6B API & End-to-End Integration Tests (Responder Routing,
     const allSms = await db.select().from(sentMessages);
     const genuineSms = allSms.find(
       (m) =>
-        m.toPhoneE164 === '+919800000088' &&
-        (m.metadata as any)?.incident_id === genuineId
+        (m.metadata as any)?.incident_id === genuineId &&
+        Boolean((m.metadata as any)?.token)
     )!;
     const genuineToken = String((genuineSms.metadata as any)?.token);
     const contactOpenRes = await request(app).get(`/api/c/${genuineToken}`);

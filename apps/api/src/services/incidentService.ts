@@ -203,6 +203,7 @@ export async function createOrMergeIncident(
   incident: IncidentDto;
   idempotent_replay: boolean;
   merged_into_existing: boolean;
+  notifiable_contacts_count?: number;
 }> {
   // 1. Idempotency check by (user_id, client_request_id)
   const [existingByClientReq] = await db

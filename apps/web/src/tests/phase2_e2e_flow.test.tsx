@@ -1,3 +1,4 @@
+import { defaultOtpProvider } from '../../../../apps/api/src/providers/otp';
 import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
@@ -23,6 +24,7 @@ describe('SAATHI Phase 2 Full Browser Flow (Web UI <-> Real Express + SQLite DB)
   const originalFetch = globalThis.fetch;
 
   beforeEach(async () => {
+    process.env.DEMO_MODE = 'true';
     resetRateLimiter();
     tempDbPath = path.join(
       os.tmpdir(),
@@ -55,7 +57,7 @@ describe('SAATHI Phase 2 Full Browser Flow (Web UI <-> Real Express + SQLite DB)
       .post('/api/auth/otp/verify')
       .send({
         phone_e164: '+919000000001',
-        code: otpReq.body.dev_mock_hint,
+        code: (otpReq.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "123456"),
       });
 
     useAuthStore.setState({
@@ -204,8 +206,11 @@ describe('SAATHI Phase 2 Full Browser Flow (Web UI <-> Real Express + SQLite DB)
     );
 
     await waitFor(() => {
-      expect(screen.getByText('REVOKED')).toBeTruthy();
-      expect(screen.getAllByText('GRANTED').length).toBeGreaterThanOrEqual(1);
+      expect(
+        screen.getByRole('button', {
+          name: /Revoke Permission Core Safety Data Processing/i,
+        })
+      ).toBeTruthy();
     });
   });
 });

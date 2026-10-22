@@ -797,4 +797,92 @@ test('6. Offline: go offline, trigger SOS, see the queued state and the SMS opti
     await setTheme(true);
     await assertNoSeriousViolations('Responder Dashboard (Dark)');
   });
+
+  test('14. Phase 10A: Fake incoming call flow (settings, countdown, ringing, accept, timer, end) creates zero incidents', async ({
+    page,
+    baseURL,
+  }) => {
+    await loginViaApiOnPage(page, baseURL!, DEMO_USER_PHONE);
+
+    // 1. Configure fake call settings: caller name "Sister Priya" and delay 0s (immediate)
+    await page.goto(`${baseURL}/settings`);
+    await expect(page.getByTestId('fake-call-settings-section')).toBeVisible();
+    await page.getByTestId('fake-call-caller-name-input').fill('Sister Priya');
+    await page.getByTestId('fake-call-delay-btn-0').click();
+    await expect(page.getByTestId('fake-call-limit-note')).toBeVisible();
+
+    // 2. Open Home and click Fake call
+    await page.goto(`${baseURL}/home`);
+    await expect(page.getByTestId('home-fake-call-btn')).toBeVisible();
+    await page.getByTestId('home-fake-call-btn').click();
+
+    // 3. Realistic ringing screen appears immediately (delay=0s) with caller name
+    await expect(page.getByTestId('fake-call-ringing-screen')).toBeVisible();
+    await expect(page.getByTestId('fake-call-caller-name')).toHaveText('Sister Priya');
+    await expect(page.getByTestId('fake-call-accept-btn')).toBeVisible();
+    await expect(page.getByTestId('fake-call-decline-btn')).toBeVisible();
+
+    // Verify product name is NOT displayed on the call screen
+    const screenText = await page.getByTestId('fake-call-ringing-screen').innerText();
+    expect(screenText).not.toContain('SHAKTI');
+    expect(screenText).not.toContain('SAATHI');
+
+    // 4. Accept the call -> active call screen with running timer
+    await page.getByTestId('fake-call-accept-btn').click();
+    await expect(page.getByTestId('fake-call-active-screen')).toBeVisible();
+    await expect(page.getByTestId('fake-call-active-caller')).toHaveText('Sister Priya');
+    await expect(page.getByTestId('fake-call-timer')).toBeVisible();
+
+    // 5. End call returns to Home
+    await page.getByTestId('fake-call-end-btn').click();
+    await expect(page.getByTestId('fake-call-active-screen')).not.toBeVisible();
+    await expect(page.getByTestId('home-fake-call-btn')).toBeVisible();
+
+    // 6. Assert that zero incidents were created
+    const incidentsRes = await page.evaluate(async () => {
+      const res = await fetch('/api/incidents/active');
+      return res.json();
+    });
+    expect(incidentsRes.incident).toBeNull();
+  });
+
+  test('15. Phase 10A: Loud alarm flow (honest note, start, sounding screen, stop) creates zero incidents', async ({
+    page,
+    baseURL,
+  }) => {
+    await loginViaApiOnPage(page, baseURL!, DEMO_USER_PHONE);
+
+    // 1. Open Home and click Loud alarm
+    await page.goto(`${baseURL}/home`);
+    await expect(page.getByTestId('home-loud-alarm-btn')).toBeVisible();
+    await page.getByTestId('home-loud-alarm-btn').click();
+
+    // 2. Start modal appears with honest warning note
+    await expect(page.getByTestId('loud-alarm-idle-modal')).toBeVisible();
+    await expect(page.getByTestId('loud-alarm-honest-note')).toBeVisible();
+    const honestNote = await page.getByTestId('loud-alarm-honest-note').innerText();
+    expect(honestNote).toContain('This makes a loud sound to attract attention. It does not alert anyone.');
+
+    // 3. Start alarm -> sounding screen appears with prominent STOP button
+    await page.getByTestId('loud-alarm-start-btn').click();
+    await expect(page.getByTestId('loud-alarm-sounding-screen')).toBeVisible();
+    await expect(page.getByTestId('loud-alarm-stop-btn')).toBeVisible();
+
+    // 4. Stop alarm -> silences siren and returns to idle start screen
+    await page.getByTestId('loud-alarm-stop-btn').click();
+    await expect(page.getByTestId('loud-alarm-sounding-screen')).not.toBeVisible();
+    await expect(page.getByTestId('loud-alarm-idle-modal')).toBeVisible();
+
+    // 5. Close modal
+    await page.getByTestId('loud-alarm-close-btn').click();
+    await expect(page.getByTestId('loud-alarm-idle-modal')).not.toBeVisible();
+    await expect(page.getByTestId('home-loud-alarm-btn')).toBeVisible();
+
+    // 6. Assert that zero incidents were created
+    const incidentsRes = await page.evaluate(async () => {
+      const res = await fetch('/api/incidents/active');
+      return res.json();
+    });
+    expect(incidentsRes.incident).toBeNull();
+  });
 });

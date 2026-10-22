@@ -69,3 +69,11 @@ This document provides a realistic, unembellished assessment of the technical bo
 ## 10. Audit & Lighthouse Benchmarking
 
 - Lighthouse performance and PWA scores vary depending on network throttling, host hardware, and device CPU, and have not yet been recorded for formal benchmarking. Real-world deployment will require independent load testing, performance auditing, and compliance certification before deployment in high-stakes environments.
+
+---
+
+## 11. Secondary Safety Tools (Fake Call & Loud Alarm)
+
+- **Background Timer Pauses**: In mobile web browsers, JavaScript timers (`setTimeout`/`setInterval`) are throttled or suspended when the device screen locks or the browser tab is sent to the background. Therefore, the fake incoming call countdown timer pauses if the phone locks or the app goes to the background, and resumes when brought back to the foreground.
+- **Device Volume & Silent Switch Control**: Web Audio API synthesis output is governed strictly by the physical device's master media volume and operating system audio profiles. The web application cannot override hardware volume buttons, hardware mute switches, or operating system "Do Not Disturb" / silent profiles. Users must ensure device volume is turned up for the loud alarm to be effective.
+

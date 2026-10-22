@@ -18,7 +18,7 @@ import { OnboardingPage } from '../pages/OnboardingPage';
 import { authApi, consentsApi, contactsApi } from '../lib/api';
 import * as offlineQueue from '../lib/offlineQueue';
 
-const NORMAL_USER: UserProfile = {
+const NORMAL_USER: any = {
   id: 'usr_user_1',
   phone_e164: '+919000000001',
   name: 'Aarohi Sharma',
@@ -33,6 +33,7 @@ const NORMAL_USER: UserProfile = {
 
 describe('Phase 8C Web — Privacy Tools & Emergency Data Policy', () => {
   beforeEach(async () => {
+    process.env.DEMO_MODE = 'true';
     vi.restoreAllMocks();
     await i18n.changeLanguage('en');
     useAuthStore.setState({
@@ -184,11 +185,10 @@ describe('Phase 8C Web — Privacy Tools & Emergency Data Policy', () => {
   it('2. Emergency Data Policy page (/policy): renders all 5 sections in English + Hindi and is linked from Onboarding, Consent Center, Settings, and Footer', async () => {
     vi.spyOn(consentsApi, 'getConsents').mockResolvedValue({
       current: {
-        location_sharing: true,
-        contact_alerts: true,
-        sms_fallback: true,
-        crowd_reporting: false,
-      },
+        data_processing: true,
+        location: true,
+        notifications: true,
+      } as any,
       history: [],
     });
     vi.spyOn(contactsApi, 'listContacts').mockResolvedValue({ contacts: [] });

@@ -774,5 +774,48 @@
       "responderOnWayBtn": "Simulate Responder: On the Way",
       "responderResolveBtn": "Simulate Responder: Resolve"
     }
+  },
+  "fakeCall": {
+    "homeBtn": "नकली कॉल",
+    "settingsTitle": "नकली इनकमिंग कॉल",
+    "settingsSubtitle": "असहज स्थिति से सम्मानपूर्वक बाहर निकलने के लिए एक नकली फोन कॉल प्राप्त करें।",
+    "callerNameLabel": "कॉलर का नाम (अधिकतम 30 वर्ण)",
+    "callerNamePlaceholder": "माँ",
+    "delayLabel": "कॉल में देरी",
+    "delayNow": "अभी (तुरंत)",
+    "delay10s": "10 सेकंड",
+    "delay30s": "30 सेकंड",
+    "delay60s": "1 मिनट",
+    "backgroundLimitNote": "यदि फोन लॉक हो जाता है या ऐप बैकग्राउंड में चला जाता है तो टाइमर रुक जाता है।",
+    "countdownTitle": "इनकमिंग कॉल निर्धारित",
+    "countdownSubtitle": "{{seconds}} सेकंड में {{name}} से नकली कॉल...",
+    "cancelBtn": "नकली कॉल रद्द करें",
+    "incomingCallLabel": "इनकमिंग कॉल",
+    "mobileLabel": "मोबाइल",
+    "acceptBtn": "स्वीकार करें",
+    "declineBtn": "अस्वीकार करें",
+    "endBtn": "कॉल समाप्त करें",
+    "muteLabel": "म्यूट",
+    "keypadLabel": "कीपैड",
+    "speakerLabel": "स्पीकर"
+  },
+  "loudAlarm": {
+    "homeBtn": "तेज अलार्म",
+    "title": "तेज सुरक्षा अलार्म",
+    "honestNote": "यह ध्यान आकर्षित करने के लिए एक तेज आवाज करता है। यह किसी को अलर्ट नहीं भेजता है। फोन का वॉल्यूम बढ़ाएं। कुछ स्थितियों में तेज अलार्म स्थिति को और खराब कर सकता है; निर्णय आपका है।",
+    "startBtn": "अलार्म शुरू करें",
+    "stopBtn": "अलार्म बंद करें",
+    "stopSubtitle": "सायरन को तुरंत शांत करने के लिए टैप करें",
+    "soundingTitle": "तेज अलार्म बज रहा है",
+    "autoStopNotice": "{{time}} में अपने आप बंद हो जाएगा",
+    "reducedMotionNotice": "स्थिर डिस्प्ले मोड सक्रिय (कम गति)"
+  },
+  "supportOptions": {
+    "cardTitle": "क्या आपको किसी से बात करने की ज़रूरत है? सहायता विकल्प देखें",
+    "prompt": "क्या आपको किसी से बात करने की ज़रूरत है?",
+    "cta": "सहायता विकल्प देखें",
+    "offlineNotice": "ऑफ़लाइन: आधिकारिक हेल्पलाइन नंबर सीधे उपलब्ध हैं",
+    "call181": "181 पर कॉल करें",
+    "call112": "112 पर कॉल करें"
   }
 }

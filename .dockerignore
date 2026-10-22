@@ -1,0 +1,15 @@
+node_modules
+dist
+.git
+.github
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+.env
+.env.local
+.env.*.local
+docs/test-logs
+test-results
+coverage
+.DS_Store

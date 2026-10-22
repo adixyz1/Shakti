@@ -32,7 +32,8 @@ export interface TriggerSettingsState {
   disguiseSequenceHash: string | null;
 
   lowPowerDataSaverMode: boolean;
-
+  fakeCallCallerName: string;
+  fakeCallDelaySeconds: number;
   setTripleTapEnabled: (enabled: boolean) => void;
   setTripleTapZone: (zone: TapZoneArea) => void;
   setShortcutEnabled: (enabled: boolean) => void;
@@ -49,6 +50,8 @@ export interface TriggerSettingsState {
   setDisguiseSequenceHash: (hash: string | null) => void;
   configureDisguiseSequence: (plainSequence: string) => Promise<string>;
   setLowPowerDataSaverMode: (enabled: boolean) => void;
+  setFakeCallCallerName: (name: string) => void;
+  setFakeCallDelaySeconds: (seconds: number) => void;
   resetTriggerSettings: () => void;
 }
 
@@ -67,6 +70,8 @@ interface PersistedSlice {
   disguiseEnabled: boolean;
   disguiseSequenceHash: string | null;
   lowPowerDataSaverMode: boolean;
+  fakeCallCallerName: string;
+  fakeCallDelaySeconds: number;
 }
 
 const DEFAULT_PERSISTED: PersistedSlice = {
@@ -82,6 +87,8 @@ const DEFAULT_PERSISTED: PersistedSlice = {
   disguiseEnabled: false,
   disguiseSequenceHash: null, // NO default secret sequence!
   lowPowerDataSaverMode: false,
+  fakeCallCallerName: 'Mum',
+  fakeCallDelaySeconds: 10,
 };
 
 export const DISGUISE_PBKDF2_ITERATIONS = 200000;
@@ -117,7 +124,7 @@ async function computePbkdf2Hex(
     const encoded = new TextEncoder().encode(input);
     const keyMaterial = await globalThis.crypto.subtle.importKey(
       'raw',
-      encoded,
+      encoded as unknown as BufferSource,
       { name: 'PBKDF2' },
       false,
       ['deriveBits']
@@ -125,7 +132,7 @@ async function computePbkdf2Hex(
     const derivedBits = await globalThis.crypto.subtle.deriveBits(
       {
         name: 'PBKDF2',
-        salt: saltBytes,
+        salt: saltBytes as unknown as BufferSource,
         iterations,
         hash: 'SHA-256',
       },
@@ -327,6 +334,8 @@ function savePersistedSettings(state: TriggerSettingsState): void {
       disguiseEnabled: state.disguiseEnabled,
       disguiseSequenceHash: state.disguiseSequenceHash,
       lowPowerDataSaverMode: state.lowPowerDataSaverMode,
+      fakeCallCallerName: state.fakeCallCallerName,
+      fakeCallDelaySeconds: state.fakeCallDelaySeconds,
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
@@ -429,6 +438,17 @@ export const useTriggerSettingsStore = create<TriggerSettingsState>((set, get) =
   },
   setLowPowerDataSaverMode: (lowPowerDataSaverMode) => {
     set({ lowPowerDataSaverMode });
+    savePersistedSettings(get());
+  },
+  setFakeCallCallerName: (name: string) => {
+    const trimmed = name.trim().slice(0, 30);
+    const valid = trimmed.length > 0 ? trimmed : 'Mum';
+    set({ fakeCallCallerName: valid });
+    savePersistedSettings(get());
+  },
+  setFakeCallDelaySeconds: (seconds: number) => {
+    const valid = [0, 10, 30, 60].includes(seconds) ? seconds : 10;
+    set({ fakeCallDelaySeconds: valid });
     savePersistedSettings(get());
   },
   resetTriggerSettings: () => {

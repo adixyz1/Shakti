@@ -23,16 +23,31 @@ export function securityHeadersMiddleware(
   next: NextFunction
 ): void {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader(
     'Permissions-Policy',
     'geolocation=(self), camera=(), microphone=()'
   );
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org; connect-src 'self' ws: wss:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
-  );
+
+  const isTest =
+    process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+  const isDev = process.env.NODE_ENV !== 'production';
+
+  if (!isTest && isDev) {
+    // Development mode in AI Studio environment (preview rendered within iframe):
+    // Allow embedding from iframe ancestors and permit Vite development scripts and styles
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org; connect-src 'self' ws: wss: http: https:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors *"
+    );
+  } else {
+    // Production & Test mode: enforce strict anti-clickjacking headers
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org; connect-src 'self' ws: wss:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    );
+  }
   next();
 }
 
@@ -94,10 +109,19 @@ export function csrfProtectionMiddleware(
     return;
   }
 
-  const hostHeader = (
-    (typeof req.headers['x-forwarded-host'] === 'string'
-      ? req.headers['x-forwarded-host'].split(',')[0]
-      : req.headers.host) || ''
+  const trustProxy = Boolean(
+    req.app?.get?.('trust proxy') ||
+    (process.env.TRUST_PROXY || '').trim() === '1' ||
+    (process.env.TRUST_PROXY || '').trim().toLowerCase() === 'true'
+  );
+
+  const rawForwardedHost =
+    typeof req.headers['x-forwarded-host'] === 'string'
+      ? req.headers['x-forwarded-host'].split(',')[0].trim()
+      : undefined;
+
+  const effectiveHost = (
+    (trustProxy && rawForwardedHost ? rawForwardedHost : req.headers.host) || ''
   )
     .trim()
     .toLowerCase();
@@ -109,7 +133,7 @@ export function csrfProtectionMiddleware(
   );
 
   if (
-    (hostHeader && originHost === hostHeader) ||
+    (effectiveHost && originHost === effectiveHost) ||
     allowedOrigins.has(originBase)
   ) {
     next();

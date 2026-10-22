@@ -330,13 +330,14 @@ export async function deleteUserAccount(
     .where(eq(incidents.userId, user.id));
 
   const hasOpenIncident = userIncidents.some((inc) => {
+    const s = inc.status as string;
     if (
-      inc.status === 'TRIGGERED' ||
-      inc.status === 'CREATED' ||
-      inc.status === 'CANCEL_WINDOW' ||
-      inc.status === 'ACTIVE' ||
-      inc.status === 'ESCALATED' ||
-      inc.status === 'ACKNOWLEDGED'
+      s === 'TRIGGERED' ||
+      s === 'CREATED' ||
+      s === 'CANCEL_WINDOW' ||
+      s === 'ACTIVE' ||
+      s === 'ESCALATED' ||
+      s === 'ACKNOWLEDGED'
     ) {
       return true;
     }

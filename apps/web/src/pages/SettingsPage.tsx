@@ -11,6 +11,7 @@ import {
   KeyRound,
   Keyboard,
   Mic,
+  Phone,
   ShieldCheck,
   Smartphone,
   Sparkles,
@@ -67,6 +68,10 @@ export const SettingsPage: React.FC = () => {
     setDisguiseEnabled,
     configureDisguiseSequence,
     setLowPowerDataSaverMode,
+    fakeCallCallerName,
+    fakeCallDelaySeconds,
+    setFakeCallCallerName,
+    setFakeCallDelaySeconds,
   } = useTriggerSettingsStore();
 
   // Cancel Window (0-10s)
@@ -1426,6 +1431,86 @@ export const SettingsPage: React.FC = () => {
                 </BigButton>
               </>
             )}
+          </Card>
+        </section>
+
+        {/* Phase 10A: Fake Call Settings */}
+        <section className="space-y-4" data-testid="fake-call-settings-section">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Phone className="w-5 h-5 text-teal-700 dark:text-teal-400" />
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                {t('fakeCall.settingsTitle')}
+              </h2>
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              {t('fakeCall.settingsSubtitle')}
+            </p>
+          </div>
+
+          <Card className="space-y-4">
+            {/* Caller Name Input (max 30 chars, default "Mum") */}
+            <div className="space-y-1.5">
+              <label
+                htmlFor="fake-call-caller-name-input"
+                className="block text-sm font-semibold text-slate-900 dark:text-slate-100"
+              >
+                {t('fakeCall.callerNameLabel')}
+              </label>
+              <Input
+                id="fake-call-caller-name-input"
+                data-testid="fake-call-caller-name-input"
+                type="text"
+                maxLength={30}
+                value={fakeCallCallerName}
+                onChange={(e) => setFakeCallCallerName(e.target.value)}
+                placeholder={t('fakeCall.callerNamePlaceholder')}
+                className="min-h-[56px] text-base"
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {fakeCallCallerName.length}/30
+              </p>
+            </div>
+
+            {/* Delay Selector: Now (0s), 10s, 30s, 1 min (60s) */}
+            <div className="space-y-1.5">
+              <label className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {t('fakeCall.delayLabel')}
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { seconds: 0, label: t('fakeCall.delayNow') },
+                  { seconds: 10, label: t('fakeCall.delay10s') },
+                  { seconds: 30, label: t('fakeCall.delay30s') },
+                  { seconds: 60, label: t('fakeCall.delay60s') },
+                ].map((option) => {
+                  const isSelected = fakeCallDelaySeconds === option.seconds;
+                  return (
+                    <button
+                      key={option.seconds}
+                      type="button"
+                      data-testid={`fake-call-delay-btn-${option.seconds}`}
+                      onClick={() => setFakeCallDelaySeconds(option.seconds)}
+                      className={`min-h-[56px] px-3 py-2.5 rounded-xl text-xs font-semibold border-2 transition-all flex items-center justify-center text-center focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/50 ${
+                        isSelected
+                          ? 'bg-teal-700 border-teal-700 text-white'
+                          : 'border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Honest Limit Note in Settings */}
+            <div
+              data-testid="fake-call-limit-note"
+              className="p-3.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 leading-relaxed"
+            >
+              {t('fakeCall.backgroundLimitNote')}
+            </div>
           </Card>
         </section>
 

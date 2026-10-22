@@ -273,6 +273,7 @@ export async function submitSafetyPulse(
     userId: storedUserId,
     safetyScore: score,
     avoidedGoingSomewhere: input.avoided_going_somewhere,
+    isDemo: false,
     createdAt: createdAtValue,
   };
 

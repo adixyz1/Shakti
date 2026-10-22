@@ -774,5 +774,48 @@
       "responderOnWayBtn": "Simulate Responder: On the Way",
       "responderResolveBtn": "Simulate Responder: Resolve"
     }
+  },
+  "fakeCall": {
+    "homeBtn": "Fake call",
+    "settingsTitle": "Fake Incoming Call",
+    "settingsSubtitle": "Simulate an incoming phone call to exit uncomfortable situations politely.",
+    "callerNameLabel": "Caller name (max 30 characters)",
+    "callerNamePlaceholder": "Mum",
+    "delayLabel": "Call delay",
+    "delayNow": "Now (immediate)",
+    "delay10s": "10 seconds",
+    "delay30s": "30 seconds",
+    "delay60s": "1 minute",
+    "backgroundLimitNote": "The timer pauses if the phone locks or the app goes to the background.",
+    "countdownTitle": "Incoming call scheduled",
+    "countdownSubtitle": "Fake call from {{name}} in {{seconds}}s...",
+    "cancelBtn": "Cancel fake call",
+    "incomingCallLabel": "Incoming call",
+    "mobileLabel": "Mobile",
+    "acceptBtn": "Accept",
+    "declineBtn": "Decline",
+    "endBtn": "End call",
+    "muteLabel": "Mute",
+    "keypadLabel": "Keypad",
+    "speakerLabel": "Speaker"
+  },
+  "loudAlarm": {
+    "homeBtn": "Loud alarm",
+    "title": "Loud Safety Alarm",
+    "honestNote": "This makes a loud sound to attract attention. It does not alert anyone. Turn the phone volume up. In some situations a loud alarm may make things worse; you decide.",
+    "startBtn": "Start alarm",
+    "stopBtn": "STOP ALARM",
+    "stopSubtitle": "Tap to silence the siren immediately",
+    "soundingTitle": "Loud alarm sounding",
+    "autoStopNotice": "Will stop automatically in {{time}}",
+    "reducedMotionNotice": "Steady display mode active (reduced motion)"
+  },
+  "supportOptions": {
+    "cardTitle": "Need someone to talk to? See support options",
+    "prompt": "Need someone to talk to?",
+    "cta": "See support options",
+    "offlineNotice": "Offline: Official helpline numbers available directly",
+    "call181": "Call 181",
+    "call112": "Call 112"
   }
 }

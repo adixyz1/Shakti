@@ -111,6 +111,7 @@ export async function createSafetyReport(
     note: validatedNote,
     anonymous: isAnonymous,
     userId: storedUserId,
+    isDemo: false,
     createdAt: createdAtValue,
   };
 

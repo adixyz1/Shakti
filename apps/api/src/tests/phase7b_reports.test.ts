@@ -1,3 +1,4 @@
+import { defaultOtpProvider } from '../providers/otp';
 import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
@@ -18,6 +19,8 @@ describe('SAATHI Phase 7B API Tests (Reports & K-Anonymized Aggregated Safety La
   const app = createApp();
 
   beforeEach(async () => {
+    process.env.DEMO_MODE = 'true';
+    process.env.DEMO_ADMIN_HINT = 'true';
     clearAllScheduledTimers();
     resetRateLimiter();
 
@@ -48,7 +51,7 @@ describe('SAATHI Phase 7B API Tests (Reports & K-Anonymized Aggregated Safety La
       .send({ phone_e164: phone });
     const verifyRes = await agent
       .post('/api/auth/otp/verify')
-      .send({ phone_e164: phone, code: otpRes.body.dev_mock_hint, name });
+      .send({ phone_e164: phone, code: (otpRes.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "000000"), name });
     return {
       agent,
       user: verifyRes.body,

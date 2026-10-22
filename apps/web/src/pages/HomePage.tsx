@@ -3,10 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
+  Bell,
   CheckCircle2,
   Delete,
   MapPin,
   MessageSquare,
+  Phone,
   PhoneCall,
   RefreshCw,
   ShieldAlert,
@@ -17,6 +19,10 @@ import {
 import { BigButton, Button, Card, Spinner } from '../components/ui';
 import { PageLayout } from '../components/PageLayout';
 import { PostIncidentRatingCard } from '../components/PostIncidentRatingCard';
+import { ClosedAlertSupportCard } from '../components/ClosedAlertSupportCard';
+import { FakeCallModal } from '../components/FakeCallModal';
+import { LoudAlarmModal } from '../components/LoudAlarmModal';
+import { createAudioContext } from '../lib/safetyAudio';
 import { useAuthStore } from '../store/authStore';
 import {
   ApiError,
@@ -125,6 +131,22 @@ export const HomePage: React.FC = () => {
   const [silentDuressIncidentId, setSilentDuressIncidentId] = useState<
     string | null
   >(null);
+
+  // Phase 10A: Secondary Safety Tools (Fake Call & Loud Alarm)
+  const [showFakeCall, setShowFakeCall] = useState(false);
+  const [fakeCallAudioCtx, setFakeCallAudioCtx] = useState<AudioContext | null>(null);
+  const [showLoudAlarm, setShowLoudAlarm] = useState(false);
+
+  const handleFakeCallClick = () => {
+    // Crucial: create AudioContext on this user gesture tap
+    const ctx = createAudioContext();
+    setFakeCallAudioCtx(ctx);
+    setShowFakeCall(true);
+  };
+
+  const handleLoudAlarmClick = () => {
+    setShowLoudAlarm(true);
+  };
 
   const refreshQueuedAlertsState = useCallback(async () => {
     const q = await listQueuedAlerts();
@@ -529,6 +551,7 @@ export const HomePage: React.FC = () => {
           setLatestLocation({
             id: `local_loc_${Date.now()}`,
             incident_id: incident?.id || 'queued',
+            expires_at: Date.now() + 600000,
             ...samplePayload,
           });
           setLocationStatus('active');
@@ -1563,6 +1586,9 @@ export const HomePage: React.FC = () => {
                 </BigButton>
               </Card>
 
+              {/* Phase 10B: Small calm support options card on every closed-alert screen */}
+              <ClosedAlertSupportCard />
+
               {/* Post-incident rating card: only shown after incident closes (normal or masked duress) */}
               <PostIncidentRatingCard incidentId={incident.id} />
             </section>
@@ -1677,6 +1703,28 @@ export const HomePage: React.FC = () => {
               </button>
             </div>
 
+            {/* Calm Secondary Safety Tools: Fake Call & Loud Alarm (56px targets) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                data-testid="home-fake-call-btn"
+                onClick={handleFakeCallClick}
+                className="min-h-[56px] px-5 py-3 rounded-2xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100 inline-flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/50"
+              >
+                <Phone className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                {t('fakeCall.homeBtn')}
+              </button>
+              <button
+                type="button"
+                data-testid="home-loud-alarm-btn"
+                onClick={handleLoudAlarmClick}
+                className="min-h-[56px] px-5 py-3 rounded-2xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100 inline-flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/50"
+              >
+                <Bell className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                {t('loudAlarm.homeBtn')}
+              </button>
+            </div>
+
             {/* Direct Helpline Call Links (56px targets) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               <a
@@ -1746,19 +1794,30 @@ export const HomePage: React.FC = () => {
             {/* Small dismissible weekly Safety Pulse card (never covering SOS, never shown during an active/queued alert or in disguise mode) */}
             <SafetyPulseCard
               hasActiveAlert={
-                Boolean(incident && isOpenIncident(incident.status)) ||
+                Boolean(incident && isOpenIncident((incident as any).status)) ||
                 queuedAlerts.length > 0
               }
               isDisguised={Boolean(disguiseEnabled)}
             />
 
             <DemoSimulatePanel
-              incidentId={incident?.id}
+              incidentId={(incident as any)?.id}
               onSimulated={() => void loadSafetyOverview()}
             />
           </section>
         )}
       </div>
+
+      {/* Phase 10A Safety Tools Modals */}
+      <FakeCallModal
+        isOpen={showFakeCall}
+        onClose={() => setShowFakeCall(false)}
+        audioContext={fakeCallAudioCtx}
+      />
+      <LoudAlarmModal
+        isOpen={showLoudAlarm}
+        onClose={() => setShowLoudAlarm(false)}
+      />
     </PageLayout>
   );
 };

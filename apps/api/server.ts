@@ -36,6 +36,14 @@ import { attachWebSocketHub } from './src/services/wsHub';
 export function createApp(): Express {
   const app = express();
 
+  const trustProxyEnv = (process.env.TRUST_PROXY || '').trim();
+  if (trustProxyEnv === '1' || trustProxyEnv.toLowerCase() === 'true') {
+    app.set('trust proxy', 1);
+  } else if (trustProxyEnv) {
+    const num = Number(trustProxyEnv);
+    app.set('trust proxy', isNaN(num) ? trustProxyEnv : num);
+  }
+
   app.use(securityHeadersMiddleware);
   app.use(express.json({ limit: '64kb' }));
   app.use(cookieParser());
@@ -112,10 +120,16 @@ export async function startServer(
     });
   }
 
+  const isDev = process.env.NODE_ENV !== 'production';
+  const listenPort = Number(
+    (isDev && process.env.PORT === '8080' ? 3000 : process.env.PORT) ||
+      config.port ||
+      3000
+  );
   return new Promise((resolve) => {
-    server.listen(config.port, '0.0.0.0', () => {
+    server.listen(listenPort, '0.0.0.0', () => {
       logger.info(
-        `[SAATHI Server] Single-process Express + WS + Vite listening on http://0.0.0.0:${config.port}`
+        `[SAATHI Server] Single-process Express + WS + Vite listening on http://0.0.0.0:${listenPort}`
       );
       resolve(server);
     });

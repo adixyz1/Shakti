@@ -210,7 +210,9 @@ export async function seedDatabase(
     }
   }
 
-  if (isDemoModeEnabled()) {
+  // Only seed rich demo scenario data when specifically running the demo server/route, not in unit/integration test suites
+  const isVitest = Boolean(process.env.VITEST || process.env.NODE_ENV === 'test');
+  if (isDemoModeEnabled() && !isVitest) {
     await resetAndSeedDemoData(db);
   }
 

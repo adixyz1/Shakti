@@ -1,3 +1,4 @@
+import { defaultOtpProvider } from '../providers/otp';
 import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
@@ -45,7 +46,7 @@ describe('SAATHI Phase 2 API Tests (Consents, Trusted Contacts, Invitations & Ru
       .send({ phone_e164: phone });
     const verifyRes = await agent
       .post('/api/auth/otp/verify')
-      .send({ phone_e164: phone, code: otpRes.body.dev_mock_hint });
+      .send({ phone_e164: phone, code: (otpRes.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || "000000")});
     return { agent, userId: verifyRes.body.id as string };
   }
 

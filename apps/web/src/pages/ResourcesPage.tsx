@@ -15,6 +15,70 @@ const RESOURCE_CATEGORIES = [
   'counseling',
 ] as const;
 
+export const OFFLINE_LOCAL_RESOURCES: ResourceDto[] = [
+  {
+    id: 'res_offline_181',
+    name: '181 Women Helpline',
+    category: 'women_helpline',
+    phone: '181',
+    description:
+      'Toll-free 24-hour telecom helpline for women seeking support, crisis intervention, and referral.',
+    available_hours: '24x7',
+    active: true,
+  },
+  {
+    id: 'res_offline_112',
+    name: '112 Emergency Response Support System (ERSS)',
+    category: 'emergency',
+    phone: '112',
+    description:
+      'National pan-India emergency response number for police, fire, and medical assistance.',
+    available_hours: '24x7',
+    active: true,
+  },
+];
+
+export function sortResourcesForSupport(items: ResourceDto[]): ResourceDto[] {
+  const getRank = (item: ResourceDto): number => {
+    const cat = (item.category || '').toLowerCase();
+    const phone = (item.phone || '').trim();
+    const name = (item.name || '').toLowerCase();
+    const id = (item.id || '').toLowerCase();
+
+    // 1. counseling
+    if (cat === 'counseling' || name.includes('counsel') || id.includes('counsel')) {
+      return 1;
+    }
+    // 2. legal-aid
+    if (cat === 'legal_aid' || cat === 'legal' || name.includes('legal') || id.includes('legal')) {
+      return 2;
+    }
+    // 3. One Stop Centre
+    if (
+      cat === 'one_stop_centre' ||
+      cat === 'one_stop' ||
+      name.includes('one stop') ||
+      name.includes('sakhi') ||
+      id.includes('osc') ||
+      id.includes('one_stop')
+    ) {
+      return 3;
+    }
+    // 4. 181 / Women Helpline
+    if (
+      phone === '181' ||
+      cat === 'women_helpline' ||
+      name.includes('181') ||
+      id.includes('181')
+    ) {
+      return 4;
+    }
+    return 10;
+  };
+
+  return [...items].sort((a, b) => getRank(a) - getRank(b));
+}
+
 export const ResourcesPage: React.FC = () => {
   const { t } = useTranslation();
 
@@ -31,9 +95,24 @@ export const ResourcesPage: React.FC = () => {
           q: qVal.trim() || undefined,
           category: catVal === 'all' ? undefined : catVal,
         });
-        setResources(res.resources || []);
+        const items = res.resources || [];
+        setResources(sortResourcesForSupport(items));
       } catch {
-        setResources([]);
+        // If resources are not available offline, show 181 and 112 call links from local constants
+        const qNorm = qVal.trim().toLowerCase();
+        const fallback = OFFLINE_LOCAL_RESOURCES.filter((r) => {
+          if (catVal !== 'all' && r.category !== catVal) {
+            return false;
+          }
+          if (
+            qNorm &&
+            !`${r.name} ${r.phone} ${r.description}`.toLowerCase().includes(qNorm)
+          ) {
+            return false;
+          }
+          return true;
+        });
+        setResources(fallback.length > 0 ? fallback : OFFLINE_LOCAL_RESOURCES);
       } finally {
         setIsLoading(false);
       }

@@ -1,3 +1,4 @@
+import { defaultOtpProvider } from '../providers/otp';
 import fs from 'fs';
 import http from 'http';
 import os from 'os';
@@ -279,7 +280,7 @@ describe('Phase 9A: Security Hardening (Safeguards, Auth Sweep, CSRF, Headers/Li
       .post('/api/auth/otp/request')
       .send({ phone_e164: phone });
     expect(reqRes.status).toBe(200);
-    const code = reqRes.body.dev_mock_hint;
+    const code = reqRes.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || '123456';
     const verRes = await agent
       .post('/api/auth/otp/verify')
       .send({ phone_e164: phone, code, name });
@@ -513,7 +514,7 @@ describe('Phase 9A: Security Hardening (Safeguards, Auth Sweep, CSRF, Headers/Li
     const otpReqForProd = await request(app)
       .post('/api/auth/otp/request')
       .send({ phone_e164: '+919000000077' });
-    const otpCodeForProd = otpReqForProd.body.dev_mock_hint;
+    const otpCodeForProd = otpReqForProd.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || '123456';
 
     const prevNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
@@ -1014,7 +1015,7 @@ describe('Phase 9A: Security Hardening (Safeguards, Auth Sweep, CSRF, Headers/Li
         .post('/api/auth/otp/request')
         .send({ phone_e164: testPhone });
       expect(otpReq.status).toBe(200);
-      const otpCode = otpReq.body.dev_mock_hint;
+      const otpCode = otpReq.body.dev_mock_hint || (defaultOtpProvider as any).lastOtpCode || '123456';
       const otpVer = await piiAgent.post('/api/auth/otp/verify').send({
         phone_e164: testPhone,
         code: otpCode,
