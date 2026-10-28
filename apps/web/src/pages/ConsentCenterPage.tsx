@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BigButton, Button, Card, Spinner } from '../components/ui';
+import { Button, Card, Spinner } from '../components/ui';
 import { PageLayout } from '../components/PageLayout';
 import {
   consentsApi,
@@ -165,33 +165,82 @@ export const ConsentCenterPage: React.FC = () => {
 
   return (
     <PageLayout>
-      <div className="space-y-8 py-4">
-        <header className="space-y-2 border-b border-slate-200 dark:border-slate-800 pb-6">
-          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 dark:text-slate-50">
-            {t('consents.title')}
-          </h1>
-          <p className="text-sm md:text-base text-slate-600 dark:text-slate-300 max-w-3xl leading-relaxed">
+      <div className="space-y-6 py-2">
+        {/* Header */}
+        <header className="space-y-2 border-b border-line pb-5">
+          <div className="flex items-center gap-2">
+            <svg
+              aria-hidden="true"
+              className="w-6 h-6 stroke-ink fill-none stroke-2 shrink-0"
+              strokeLinecap="square"
+              strokeLinejoin="miter"
+              viewBox="0 0 24 24"
+            >
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <path d="M12 8v4" />
+              <path d="M12 16h.01" />
+            </svg>
+            <h1 className="text-2xl md:text-3xl font-bold text-ink tracking-tight">
+              {t('consents.title')}
+            </h1>
+          </div>
+          <p className="text-sm md:text-base text-muted max-w-3xl leading-relaxed">
             {t('consents.subtitle')}
           </p>
           <div className="pt-1">
             <Link
               to="/policy"
               data-testid="consents-policy-link"
-              className="text-sm font-semibold text-teal-800 dark:text-teal-300 underline underline-offset-4"
+              className="text-xs font-mono font-semibold text-teal-700 underline underline-offset-4 hover:text-teal-800"
             >
               {t('privacyTools.policyLinkBtn')}
             </Link>
           </div>
         </header>
 
+        {/* Mandatory Background Operation Limitation Notice */}
+        <section
+          aria-labelledby="notice-heading"
+          className="bg-surface p-4 border border-line rounded-xl"
+        >
+          <div className="flex items-start gap-3">
+            <svg
+              aria-hidden="true"
+              className="w-5 h-5 stroke-ink fill-none stroke-2 shrink-0 mt-0.5"
+              strokeLinecap="square"
+              strokeLinejoin="miter"
+              viewBox="0 0 24 24"
+            >
+              <polygon points="12 2 2 22 22 22 12 2" />
+              <line x1="12" x2="12" y1="9" y2="13" />
+              <line x1="12" x2="12.01" y1="17" y2="17" />
+            </svg>
+            <div className="flex flex-col gap-1">
+              <h2 className="text-xs font-mono uppercase tracking-wider font-semibold text-ink" id="notice-heading">
+                Background Operation Limitation
+              </h2>
+              <p className="text-sm text-ink font-semibold">
+                Notice: Shake and voice triggers work only while the app is open.
+              </p>
+              <p className="text-xs text-muted leading-relaxed">
+                Operating system privacy constraints suspend motion sensors and live microphone loops once the display locks or the app is minimized.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {isLoading ? (
-          <div className="py-12 flex justify-center text-teal-700 dark:text-teal-400">
+          <div className="py-12 flex justify-center text-teal-700">
             <Spinner className="w-8 h-8" />
           </div>
         ) : (
           <>
             {/* Permission Explanation & Toggle Cards */}
-            <section className="space-y-4" aria-label={t('consents.title')}>
+            <section
+              className="space-y-4"
+              aria-label={t('consents.title')}
+              role="group"
+            >
               {ORDERED_CONSENT_TYPES.map((type) => {
                 const isGranted = Boolean(current[type]);
                 const isBusy = busyType === type;
@@ -199,87 +248,99 @@ export const ConsentCenterPage: React.FC = () => {
                 const itemTitle = t(`consents.items.${type}.title`);
 
                 return (
-                  <Card key={type} className="space-y-4">
-                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                      <div className="space-y-1">
+                  <article
+                    key={type}
+                    className="bg-surface p-4 border border-line rounded-xl flex flex-col gap-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex flex-col min-w-0">
                         <div className="flex items-center gap-2 text-xs font-mono tabular-nums">
                           <span
                             className={
                               isGranted
-                                ? 'font-semibold text-teal-700 dark:text-teal-400'
-                                : 'text-slate-500 dark:text-slate-400'
+                                ? 'font-semibold text-teal-700'
+                                : 'text-muted'
                             }
                           >
                             {isGranted
                               ? t('consents.statusGranted')
                               : t('consents.statusRevoked')}
                           </span>
-                          <span aria-hidden="true">·</span>
-                          <span className="text-slate-500 dark:text-slate-400">
+                          <span aria-hidden="true" className="text-line">·</span>
+                          <span className="text-muted font-mono uppercase text-[11px]">
                             {type}
                           </span>
                         </div>
-                        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                        <h2 className="text-base md:text-lg font-bold text-ink truncate mt-0.5">
                           {itemTitle}
                         </h2>
                       </div>
 
-                      <div className="shrink-0">
-                        {isGranted ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            isLoading={isBusy}
-                            onClick={() => handleToggleConsent(type, false)}
-                            aria-label={`${t('consents.revokeBtn')} ${itemTitle}`}
-                          >
-                            {t('consents.revokeBtn')}
-                          </Button>
+                      {/* Paper Utility Toggle Button per stitch design */}
+                      <button
+                        type="button"
+                        aria-pressed={isGranted}
+                        disabled={isBusy}
+                        onClick={() => handleToggleConsent(type, !isGranted)}
+                        aria-label={`${isGranted ? t('consents.revokeBtn') : t('consents.grantBtn')} ${itemTitle}`}
+                        className={`h-11 px-3 border border-line rounded-xl flex items-center gap-2 cursor-pointer select-none transition-none shrink-0 ${
+                          isGranted ? 'bg-surface' : 'bg-paper'
+                        } disabled:opacity-50`}
+                      >
+                        {isBusy ? (
+                          <Spinner className="w-4 h-4 text-teal-700" />
                         ) : (
-                          <BigButton
-                            type="button"
-                            variant="primary"
-                            isLoading={isBusy}
-                            className="md:w-auto"
-                            onClick={() => handleToggleConsent(type, true)}
-                            aria-label={`${t('consents.grantBtn')} ${itemTitle}`}
-                          >
-                            {t('consents.grantBtn')}
-                          </BigButton>
+                          <>
+                            <span
+                              className={`text-xs font-mono font-bold ${
+                                isGranted ? 'text-teal-700' : 'text-muted'
+                              }`}
+                            >
+                              On
+                            </span>
+                            <span className="text-line text-[11px]">|</span>
+                            <span
+                              className={`text-xs font-mono font-bold ${
+                                !isGranted ? 'text-ink' : 'text-muted'
+                              }`}
+                            >
+                              Off
+                            </span>
+                          </>
                         )}
-                      </div>
+                      </button>
                     </div>
 
-                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm border-t border-slate-100 dark:border-slate-800 pt-4">
+                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs md:text-sm border-t border-line pt-3">
                       <div>
-                        <dt className="font-semibold text-slate-800 dark:text-slate-200">
+                        <dt className="font-mono text-xs uppercase tracking-wider text-muted font-medium">
                           {t('consents.whatLabel')}
                         </dt>
-                        <dd className="text-slate-600 dark:text-slate-300">
+                        <dd className="text-ink mt-0.5">
                           {t(`consents.items.${type}.what`)}
                         </dd>
                       </div>
                       <div>
-                        <dt className="font-semibold text-slate-800 dark:text-slate-200">
+                        <dt className="font-mono text-xs uppercase tracking-wider text-muted font-medium">
                           {t('consents.whyLabel')}
                         </dt>
-                        <dd className="text-slate-600 dark:text-slate-300">
+                        <dd className="text-ink mt-0.5">
                           {t(`consents.items.${type}.why`)}
                         </dd>
                       </div>
                       <div>
-                        <dt className="font-semibold text-slate-800 dark:text-slate-200">
+                        <dt className="font-mono text-xs uppercase tracking-wider text-muted font-medium">
                           {t('consents.whoLabel')}
                         </dt>
-                        <dd className="text-slate-600 dark:text-slate-300">
+                        <dd className="text-ink mt-0.5">
                           {t(`consents.items.${type}.who`)}
                         </dd>
                       </div>
                       <div>
-                        <dt className="font-semibold text-slate-800 dark:text-slate-200">
+                        <dt className="font-mono text-xs uppercase tracking-wider text-muted font-medium">
                           {t('consents.howLongLabel')}
                         </dt>
-                        <dd className="text-slate-600 dark:text-slate-300">
+                        <dd className="text-ink mt-0.5">
                           {t(`consents.items.${type}.howLong`)}
                         </dd>
                       </div>
@@ -288,69 +349,69 @@ export const ConsentCenterPage: React.FC = () => {
                     {reducedNotice && (
                       <div
                         role="status"
-                        className="rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 p-4 space-y-1"
+                        className="bg-amber-50 border border-amber-300 p-3 rounded-xl space-y-1"
                       >
-                        <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+                        <p className="text-xs font-semibold text-amber-900">
                           {t('consents.reducedModeTitle', {
                             permission: itemTitle,
                           })}
                         </p>
-                        <p className="text-xs text-amber-800 dark:text-amber-300">
+                        <p className="text-xs text-amber-800">
                           {t('consents.reducedModeBody')}
                         </p>
                       </div>
                     )}
-                  </Card>
+                  </article>
                 );
               })}
             </section>
 
             {/* Append-Only Consent Ledger History */}
-            <section className="space-y-4 pt-4">
-              <div className="space-y-1">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <section className="space-y-3 pt-4">
+              <div className="space-y-0.5">
+                <h2 className="text-base font-bold text-ink">
                   {t('consents.historyTitle')}
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs font-mono text-muted">
                   {t('consents.historySubtitle')}
                 </p>
               </div>
 
-              <Card className="divide-y divide-slate-100 dark:divide-slate-800">
+              <Card className="divide-y divide-line p-0 bg-surface border border-line">
                 {history.length === 0 ? (
-                  <p className="text-sm text-slate-500 dark:text-slate-400 py-2">
+                  <p className="text-xs font-mono text-muted p-4">
                     {t('consents.historyEmpty')}
                   </p>
                 ) : (
                   history.map((entry) => (
                     <div
                       key={entry.id}
-                      className="py-3 first:pt-0 last:pb-0 flex flex-wrap items-center justify-between gap-2 text-xs font-mono tabular-nums"
+                      className="p-3.5 flex flex-wrap items-center justify-between gap-2 text-xs font-mono tabular-nums"
                     >
                       <div className="flex items-center gap-2">
                         <span
-                          className={
+                          className={`font-bold ${
                             entry.granted
-                              ? 'font-bold text-teal-700 dark:text-teal-400'
-                              : 'font-bold text-rose-700 dark:text-rose-400'
-                          }
+                              ? 'text-teal-700'
+                              : 'text-crimson-800'
+                          }`}
                         >
                           {entry.granted
                             ? t('consents.ledgerGranted')
                             : t('consents.ledgerRevoked')}
                         </span>
-                        <span aria-hidden="true">·</span>
-                        <span className="text-slate-900 dark:text-slate-100 font-semibold">
+                        <span aria-hidden="true" className="text-line">·</span>
+                        <span className="text-ink font-semibold">
                           {entry.type}
                         </span>
-                        <span aria-hidden="true">·</span>
-                        <span className="text-slate-500 dark:text-slate-400">
+                        <span aria-hidden="true" className="text-line">·</span>
+                        <span className="text-muted">
                           {t('consents.ledgerSource', { source: entry.source })}
                         </span>
                       </div>
                       <time
                         dateTime={entry.created_at}
-                        className="text-slate-500 dark:text-slate-400"
+                        className="text-muted"
                       >
                         {new Date(entry.created_at).toLocaleString()}
                       </time>

@@ -34,6 +34,10 @@ export interface TriggerSettingsState {
   lowPowerDataSaverMode: boolean;
   fakeCallCallerName: string;
   fakeCallDelaySeconds: number;
+
+  guestCancelPinHash: string | null;
+  guestCancelWindowSeconds: number;
+
   setTripleTapEnabled: (enabled: boolean) => void;
   setTripleTapZone: (zone: TapZoneArea) => void;
   setShortcutEnabled: (enabled: boolean) => void;
@@ -52,6 +56,11 @@ export interface TriggerSettingsState {
   setLowPowerDataSaverMode: (enabled: boolean) => void;
   setFakeCallCallerName: (name: string) => void;
   setFakeCallDelaySeconds: (seconds: number) => void;
+  setGuestCancelPinHash: (hash: string | null) => void;
+  setGuestCancelWindowSeconds: (sec: number) => void;
+  configureGuestCancelPin: (plainPin: string) => Promise<string>;
+  verifyGuestCancelPin: (candidatePin: string) => Promise<boolean>;
+  clearGuestCancelPin: () => void;
   resetTriggerSettings: () => void;
 }
 
@@ -72,6 +81,8 @@ interface PersistedSlice {
   lowPowerDataSaverMode: boolean;
   fakeCallCallerName: string;
   fakeCallDelaySeconds: number;
+  guestCancelPinHash: string | null;
+  guestCancelWindowSeconds: number;
 }
 
 const DEFAULT_PERSISTED: PersistedSlice = {
@@ -89,6 +100,8 @@ const DEFAULT_PERSISTED: PersistedSlice = {
   lowPowerDataSaverMode: false,
   fakeCallCallerName: 'Mum',
   fakeCallDelaySeconds: 10,
+  guestCancelPinHash: null,
+  guestCancelWindowSeconds: 5,
 };
 
 export const DISGUISE_PBKDF2_ITERATIONS = 200000;
@@ -301,6 +314,57 @@ export async function verifyVoiceCodewordTranscript(
   return false;
 }
 
+export const GUEST_PIN_MIN_LENGTH = 4;
+
+export async function hashGuestCancelPin(
+  plainPin: string,
+  iterations: number = DISGUISE_PBKDF2_ITERATIONS
+): Promise<string> {
+  const normalized = plainPin.trim();
+  if (normalized.length < GUEST_PIN_MIN_LENGTH) {
+    throw new Error(`PIN must be at least ${GUEST_PIN_MIN_LENGTH} digits.`);
+  }
+  const saltBytes = new Uint8Array(16);
+  if (
+    typeof globalThis.crypto !== 'undefined' &&
+    typeof globalThis.crypto.getRandomValues === 'function'
+  ) {
+    globalThis.crypto.getRandomValues(saltBytes);
+  } else {
+    for (let i = 0; i < 16; i++) {
+      saltBytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  const saltHex = bytesToHex(saltBytes);
+  const safeIterations = Math.max(DISGUISE_PBKDF2_ITERATIONS, iterations);
+  const digestHex = await computePbkdf2Hex(
+    normalized,
+    saltBytes,
+    safeIterations
+  );
+  return `pbkdf2$${safeIterations}$${saltHex}$${digestHex}$${normalized.length}`;
+}
+
+export async function verifyGuestCancelPinCandidate(
+  candidatePin: string,
+  storedHash: string | null
+): Promise<boolean> {
+  if (!storedHash || !candidatePin) return false;
+  const parts = storedHash.split('$');
+  if (parts.length !== 5 || parts[0] !== 'pbkdf2') return false;
+
+  const iterations = parseInt(parts[1], 10);
+  const saltHex = parts[2];
+  const expectedDigest = parts[3];
+  const saltBytes = hexToBytes(saltHex);
+  const actualDigest = await computePbkdf2Hex(
+    candidatePin.trim(),
+    saltBytes,
+    iterations
+  );
+  return actualDigest === expectedDigest;
+}
+
 function loadInitialSettings(): PersistedSlice {
   if (typeof window === 'undefined') {
     return { ...DEFAULT_PERSISTED };
@@ -336,6 +400,8 @@ function savePersistedSettings(state: TriggerSettingsState): void {
       lowPowerDataSaverMode: state.lowPowerDataSaverMode,
       fakeCallCallerName: state.fakeCallCallerName,
       fakeCallDelaySeconds: state.fakeCallDelaySeconds,
+      guestCancelPinHash: state.guestCancelPinHash,
+      guestCancelWindowSeconds: state.guestCancelWindowSeconds,
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
@@ -449,6 +515,29 @@ export const useTriggerSettingsStore = create<TriggerSettingsState>((set, get) =
   setFakeCallDelaySeconds: (seconds: number) => {
     const valid = [0, 10, 30, 60].includes(seconds) ? seconds : 10;
     set({ fakeCallDelaySeconds: valid });
+    savePersistedSettings(get());
+  },
+  setGuestCancelPinHash: (hash: string | null) => {
+    set({ guestCancelPinHash: hash });
+    savePersistedSettings(get());
+  },
+  setGuestCancelWindowSeconds: (sec: number) => {
+    const valid = Math.max(3, Math.min(30, sec));
+    set({ guestCancelWindowSeconds: valid });
+    savePersistedSettings(get());
+  },
+  configureGuestCancelPin: async (plainPin: string) => {
+    const hash = await hashGuestCancelPin(plainPin);
+    set({ guestCancelPinHash: hash });
+    savePersistedSettings(get());
+    return hash;
+  },
+  verifyGuestCancelPin: async (candidatePin: string) => {
+    const { guestCancelPinHash } = get();
+    return verifyGuestCancelPinCandidate(candidatePin, guestCancelPinHash);
+  },
+  clearGuestCancelPin: () => {
+    set({ guestCancelPinHash: null });
     savePersistedSettings(get());
   },
   resetTriggerSettings: () => {

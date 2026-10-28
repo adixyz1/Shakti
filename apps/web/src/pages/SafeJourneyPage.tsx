@@ -1,17 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  Footprints,
-  PhoneCall,
-  Plus,
-  ShieldAlert,
-  ShieldCheck,
-  XCircle,
-} from 'lucide-react';
 import { PageLayout } from '../components/PageLayout';
 import { Button, Card, Spinner } from '../components/ui';
 import {
@@ -201,65 +190,96 @@ export const SafeJourneyPage: React.FC = () => {
   return (
     <PageLayout>
       <div
-        className="max-w-xl mx-auto space-y-6"
+        className="max-w-xl mx-auto space-y-6 py-2"
         data-testid="safe-journey-page"
       >
-        {/* Header */}
-        <header className="space-y-2">
-          <div className="inline-flex items-center gap-2 text-teal-800 dark:text-teal-300 font-semibold text-sm">
-            <Footprints className="w-5 h-5" aria-hidden="true" />
-            <span>{t('journeys.navLink')}</span>
+        {/* Header & Status */}
+        <div className="flex items-center justify-between pb-2 border-b border-line">
+          <div className="flex items-center gap-2">
+            <svg
+              className="w-6 h-6 stroke-ink fill-none stroke-2 shrink-0"
+              strokeLinecap="square"
+              strokeLinejoin="miter"
+              viewBox="0 0 24 24"
+            >
+              <circle cx="13" cy="4" r="2" />
+              <path d="M7 21l3-7 3 2v6" />
+              <path d="M11 10l3-3 4 2v5" />
+              <path d="M6 12l4-2" />
+            </svg>
+            <h1
+              className="text-xl md:text-2xl font-bold text-ink tracking-tight"
+              data-testid="safe-journey-title"
+            >
+              {t('journeys.title')}
+            </h1>
           </div>
-          <h1
-            className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white"
-            data-testid="safe-journey-title"
-          >
-            {t('journeys.title')}
-          </h1>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            {t('journeys.subtitle')}
-          </p>
-        </header>
+          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-surface border border-line rounded-xl">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                journey && journey.status === 'active'
+                  ? 'bg-teal-700 animate-pulse'
+                  : 'bg-muted'
+              }`}
+            />
+            <span className="text-[11px] font-mono uppercase tracking-wider text-muted font-semibold">
+              {journey && journey.status === 'active' ? 'RUNNING' : 'IDLE'}
+            </span>
+          </div>
+        </div>
 
-        {/* Honest No-Tracking Rule Banner (Always visible) */}
+        {/* Mandatory Statutory Honest No-Tracking Rule Banner */}
         <div
           role="note"
           data-testid="journey-honest-no-tracking-note"
-          className="rounded-2xl border-2 border-teal-700/30 bg-teal-50/90 dark:bg-teal-950/40 dark:border-teal-500/40 p-4 flex items-start gap-3 text-teal-950 dark:text-teal-100"
+          className="p-4 bg-surface border border-line rounded-xl flex items-start gap-3"
         >
-          <ShieldCheck
-            className="w-5 h-5 text-teal-700 dark:text-teal-400 shrink-0 mt-0.5"
-            aria-hidden="true"
-          />
-          <p className="text-sm font-semibold leading-relaxed">
+          <svg
+            className="w-5 h-5 stroke-teal-700 fill-none stroke-2 shrink-0 mt-0.5"
+            strokeLinecap="square"
+            strokeLinejoin="miter"
+            viewBox="0 0 24 24"
+          >
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            <line x1="12" x2="12" y1="8" y2="12" />
+            <line x1="12" x2="12.01" y1="16" y2="16" />
+          </svg>
+          <p className="text-xs text-muted leading-relaxed">
             {t('journeys.honestNoTrackingNote')}
           </p>
         </div>
 
         {isLoading ? (
-          <div className="py-12 flex justify-center">
+          <div className="py-12 flex justify-center text-teal-700">
             <Spinner className="w-8 h-8" />
           </div>
         ) : isEffectiveLapsed && journey ? (
           /* LAPSED SCREEN */
           <Card
             data-testid="journey-lapsed-screen"
-            className="border-2 border-rose-600 dark:border-rose-500 space-y-6"
+            className="border-2 border-crimson-800 bg-surface space-y-5 rounded-2xl"
           >
             <div className="flex items-start gap-3">
-              <AlertTriangle
-                className="w-7 h-7 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5"
+              <svg
                 aria-hidden="true"
-              />
+                className="w-6 h-6 stroke-crimson-800 fill-none stroke-2 shrink-0 mt-0.5"
+                strokeLinecap="square"
+                strokeLinejoin="miter"
+                viewBox="0 0 24 24"
+              >
+                <polygon points="12 2 2 22 22 22 12 2" />
+                <line x1="12" x2="12" y1="9" y2="13" />
+                <line x1="12" x2="12.01" y1="17" y2="17" />
+              </svg>
               <div className="space-y-1">
                 <h2
-                  className="text-xl font-extrabold text-rose-800 dark:text-rose-300"
+                  className="text-lg font-bold text-crimson-800"
                   data-testid="journey-lapsed-heading"
                 >
                   {t('journeys.lapsedTitle')}
                 </h2>
                 <p
-                  className="text-sm text-slate-700 dark:text-slate-200"
+                  className="text-xs md:text-sm text-ink leading-relaxed"
                   data-testid="journey-lapsed-body"
                 >
                   {journey.contact_name
@@ -274,24 +294,30 @@ export const SafeJourneyPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2 pt-2 border-t border-line">
               <button
                 type="button"
                 data-testid="journey-lapsed-send-sos-btn"
                 disabled={isSubmitting}
                 onClick={handleSendSosFromLapsed}
-                className="w-full min-h-[56px] px-6 py-4 rounded-2xl bg-rose-700 hover:bg-rose-800 text-white font-extrabold text-base flex items-center justify-center gap-2 shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose-500/50"
+                className="w-full min-h-[52px] px-4 py-3 bg-crimson-800 active:bg-crimson-900 text-surface font-mono font-bold text-sm uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 cursor-pointer"
               >
-                <ShieldAlert className="w-5 h-5" aria-hidden="true" />
+                <svg className="w-4 h-4 stroke-current fill-none stroke-2" strokeLinecap="square" strokeLinejoin="miter" viewBox="0 0 24 24">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <path d="M12 8v4" />
+                  <path d="M12 16h.01" />
+                </svg>
                 {t('journeys.sendSosBtn')}
               </button>
 
               <a
                 href="tel:112"
                 data-testid="journey-lapsed-call-112-btn"
-                className="w-full min-h-[56px] px-6 py-4 rounded-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 text-white font-bold text-base flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/50"
+                className="w-full min-h-[48px] px-4 py-3 bg-surface border border-line text-ink hover:bg-surface-container font-mono font-bold text-sm rounded-xl flex items-center justify-center gap-2"
               >
-                <PhoneCall className="w-5 h-5" aria-hidden="true" />
+                <svg className="w-4 h-4 stroke-current fill-none stroke-2" strokeLinecap="square" strokeLinejoin="miter" viewBox="0 0 24 24">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                </svg>
                 {t('journeys.call112Btn')}
               </a>
 
@@ -301,59 +327,68 @@ export const SafeJourneyPage: React.FC = () => {
                 data-testid="journey-lapsed-im-safe-btn"
                 disabled={isSubmitting}
                 onClick={handleCompleteSafe}
-                className="min-h-[56px]"
+                className="min-h-[48px]"
               >
-                <CheckCircle2 className="w-5 h-5 mr-2" aria-hidden="true" />
                 {t('journeys.imSafeDismissBtn')}
               </Button>
             </div>
           </Card>
         ) : journey && journey.status === 'active' ? (
-          /* ACTIVE JOURNEY SCREEN */
-          <Card
+          /* ACTIVE JOURNEY SCREEN per Stitch safe_journeys */
+          <div
             data-testid="journey-active-screen"
-            className="space-y-6 border-2 border-teal-700/40 dark:border-teal-500/40"
+            className="p-4 bg-surface border border-line rounded-xl flex flex-col gap-4"
           >
             {/* T-minus Reminder Prompt Banner */}
             {isReminderDue && (
               <div
                 role="alert"
                 data-testid="journey-reminder-prompt"
-                className="rounded-xl border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/60 p-4 text-amber-950 dark:text-amber-100 space-y-1"
+                className="bg-paper border border-amber-500/80 p-3 rounded-xl text-amber-900 space-y-1"
               >
-                <p className="font-bold text-sm flex items-center gap-2">
-                  <Clock className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <p className="font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                  <span className="w-2 h-2 bg-amber-600 rounded-full"></span>
                   {t('journeys.reminderBannerTitle')}
                 </p>
-                <p className="text-xs leading-relaxed">
+                <p className="text-xs text-ink leading-relaxed">
                   {t('journeys.reminderBannerBody')}
                 </p>
               </div>
             )}
 
-            <div className="text-center space-y-2">
-              <p
-                className="text-sm font-bold uppercase tracking-wider text-teal-800 dark:text-teal-300"
-                data-testid="journey-active-heading"
-              >
-                {t('journeys.activeTitle')}
-              </p>
-              <div
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 bg-teal-700 rounded-full animate-pulse" />
+                <span
+                  className="text-xs font-mono font-semibold uppercase tracking-wider text-ink"
+                  data-testid="journey-active-heading"
+                >
+                  {journey.note ? `Active walk: ${journey.note}` : t('journeys.activeTitle')}
+                </span>
+              </div>
+              <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-teal-700">
+                Running
+              </span>
+            </div>
+
+            {/* Countdown Display */}
+            <div className="flex items-baseline justify-between py-2 border-y border-line dark:border-slate-800 my-1">
+              <span className="text-xs font-mono text-muted dark:text-slate-300 uppercase tracking-wider">
+                Auto-alert triggers in
+              </span>
+              <span
                 data-testid="journey-countdown-display"
-                className="text-5xl font-extrabold font-mono tracking-tight text-slate-900 dark:text-white py-2"
+                className="text-4xl md:text-5xl font-mono font-bold text-ink dark:text-slate-100 tabular-nums tracking-tight"
               >
                 {formatCountdownMMSS(remainingMs)}
-              </div>
-              <p
-                className="text-sm text-slate-600 dark:text-slate-300"
-                data-testid="journey-expected-by"
-              >
+              </span>
+            </div>
+
+            <div className="space-y-0.5 text-xs font-mono text-muted dark:text-slate-300">
+              <p data-testid="journey-expected-by">
                 {t('journeys.expectedByLabel', { time: expectedByFormatted })}
               </p>
-              <p
-                className="text-xs font-medium text-slate-500 dark:text-slate-400"
-                data-testid="journey-contact-summary"
-              >
+              <p data-testid="journey-contact-summary">
                 {journey.contact_name
                   ? t('journeys.notifyingContactLabel', {
                       name: journey.contact_name,
@@ -362,57 +397,83 @@ export const SafeJourneyPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Primary Big "I'm safe" Button (>= 56px) */}
-            <div className="space-y-3 pt-2">
+            {/* Quick Action Controls */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-line dark:border-slate-800">
               <button
                 type="button"
                 data-testid="journey-im-safe-btn"
                 disabled={isSubmitting}
                 onClick={handleCompleteSafe}
-                className="w-full min-h-[64px] px-6 py-4 rounded-2xl bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-lg flex items-center justify-center gap-2.5 shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/50"
+                className="h-12 bg-teal-700 active:bg-teal-800 text-surface text-xs font-mono font-bold uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer select-none"
               >
-                <CheckCircle2 className="w-6 h-6" aria-hidden="true" />
-                {t('journeys.imSafeBtn')}
+                <svg className="w-4 h-4 stroke-current fill-none stroke-2" strokeLinecap="square" strokeLinejoin="miter" viewBox="0 0 24 24">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span>{t('journeys.imSafeBtn')}</span>
               </button>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  data-testid="journey-extend-btn"
-                  disabled={isSubmitting}
-                  onClick={handleExtend10Min}
-                  className="min-h-[56px] w-full"
-                >
-                  <Plus className="w-4 h-4 mr-1.5" aria-hidden="true" />
-                  {t('journeys.extend10Btn')}
-                </Button>
+              <button
+                type="button"
+                data-testid="journey-extend-btn"
+                disabled={isSubmitting}
+                onClick={handleExtend10Min}
+                className="h-12 bg-surface dark:bg-slate-800 hover:bg-surface-container dark:hover:bg-slate-700 active:bg-surface-container border border-line dark:border-slate-700 text-ink dark:text-slate-100 text-xs font-mono font-medium rounded-xl flex items-center justify-center gap-1 transition-colors cursor-pointer"
+              >
+                <svg className="w-4 h-4 stroke-current fill-none stroke-2" strokeLinecap="square" strokeLinejoin="miter" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                <span>+10 min</span>
+              </button>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  data-testid="journey-cancel-btn"
-                  disabled={isSubmitting}
-                  onClick={handleCancelJourney}
-                  className="min-h-[56px] w-full"
-                >
-                  <XCircle className="w-4 h-4 mr-1.5" aria-hidden="true" />
-                  {t('journeys.endCancelBtn')}
-                </Button>
-              </div>
+              <button
+                type="button"
+                data-testid="journey-cancel-btn"
+                disabled={isSubmitting}
+                onClick={handleCancelJourney}
+                className="h-12 bg-transparent hover:bg-paper dark:hover:bg-slate-800 text-muted dark:text-slate-300 hover:text-ink dark:hover:text-white text-xs font-mono rounded-xl flex items-center justify-center gap-1 transition-colors cursor-pointer"
+              >
+                <svg className="w-4 h-4 stroke-current fill-none stroke-2" strokeLinecap="square" strokeLinejoin="miter" viewBox="0 0 24 24">
+                  <rect height="16" width="16" x="4" y="4" />
+                </svg>
+                <span>{t('journeys.endCancelBtn')}</span>
+              </button>
             </div>
-          </Card>
+          </div>
         ) : (
-          /* START JOURNEY SCREEN */
-          <Card data-testid="journey-start-screen" className="space-y-6">
-            {/* Duration Chips (56px targets) */}
-            <div className="space-y-3">
-              <label className="block text-sm font-bold text-slate-900 dark:text-slate-100">
+          /* START JOURNEY SCREEN per Stitch safe_journeys */
+          <div data-testid="journey-start-screen" className="flex flex-col gap-5">
+            {/* Destination Input Field */}
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="journey-note-input"
+                className="text-xs font-mono uppercase tracking-wider text-ink dark:text-slate-100 font-semibold"
+              >
+                {t('journeys.noteLabel')}
+              </label>
+              <input
+                id="journey-note-input"
+                data-testid="journey-note-input"
+                type="text"
+                maxLength={100}
+                value={journeyNote}
+                onChange={(e) => setJourneyNote(e.target.value.slice(0, 100))}
+                placeholder={t('journeys.notePlaceholder')}
+                className="w-full h-12 px-4 bg-surface dark:bg-slate-900 border border-line dark:border-slate-700 rounded-xl text-sm text-ink dark:text-slate-100 placeholder:text-muted dark:placeholder:text-slate-400 focus:outline-none focus:border-teal-700"
+              />
+              <span className="text-[11px] font-mono text-muted dark:text-slate-300">
+                Stored only on this phone for automatic circle alerts
+              </span>
+            </div>
+
+            {/* Duration Selection Chips */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-mono uppercase tracking-wider text-ink dark:text-slate-100 font-semibold">
                 {t('journeys.startSectionTitle')}
               </label>
               <div
-                className="grid grid-cols-2 sm:grid-cols-4 gap-3"
-                role="group"
+                className="grid grid-cols-4 gap-2"
+                role="radiogroup"
                 aria-label={t('journeys.startSectionTitle')}
               >
                 {DURATION_OPTIONS_MINUTES.map((mins) => {
@@ -422,35 +483,55 @@ export const SafeJourneyPage: React.FC = () => {
                       key={mins}
                       type="button"
                       data-testid={`journey-duration-chip-${mins}`}
-                      aria-pressed={isSelected}
+                      role="radio"
+                      aria-checked={isSelected}
                       onClick={() => setSelectedDuration(mins)}
-                      className={`min-h-[56px] px-4 py-3 rounded-xl font-bold text-sm border-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
+                      className={`h-12 border rounded-xl font-mono text-xs flex items-center justify-center transition-none cursor-pointer select-none ${
                         isSelected
-                          ? 'border-teal-700 bg-teal-700 text-white dark:border-teal-500 dark:bg-teal-600'
-                          : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 text-slate-800 dark:text-slate-200 hover:border-teal-600'
+                          ? 'bg-teal-700 text-surface border-teal-700 font-bold'
+                          : 'bg-paper text-ink border-line hover:bg-surface'
                       }`}
                     >
-                      {t('journeys.durationChip', { minutes: mins })}
+                      {mins}m
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Optional Contact Picker from Accepted Contacts (56px target) */}
-            <div className="space-y-2">
-              <label
-                htmlFor="journey-contact-select"
-                className="block text-sm font-bold text-slate-900 dark:text-slate-100"
-              >
-                {t('journeys.contactPickerLabel')}
-              </label>
+            {/* Contact Picker Card */}
+            <div className="p-4 bg-surface border border-line rounded-2xl space-y-3">
+              <div className="flex items-start gap-3">
+                <svg
+                  className="w-5 h-5 stroke-teal-700 fill-none stroke-2 shrink-0 mt-0.5"
+                  strokeLinecap="square"
+                  strokeLinejoin="miter"
+                  viewBox="0 0 24 24"
+                >
+                  <circle cx="9" cy="8" r="4" />
+                  <path d="M2 20c0-3.5 3.5-5 7-5s7 1.5 7 5" />
+                  <circle cx="17" cy="7" r="3" />
+                  <path d="M17 14c2.5 0 5 1 5 4" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <label
+                    htmlFor="journey-contact-select"
+                    className="text-xs font-mono uppercase tracking-wider text-ink font-semibold block"
+                  >
+                    {t('journeys.contactPickerLabel')}
+                  </label>
+                  <p className="text-xs text-muted mt-0.5">
+                    Notifies your chosen responder only if you fail to check in
+                  </p>
+                </div>
+              </div>
+
               <select
                 id="journey-contact-select"
                 data-testid="journey-contact-select"
                 value={selectedContactId}
                 onChange={(e) => setSelectedContactId(e.target.value)}
-                className="w-full min-h-[56px] px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-base focus:outline-none focus:ring-2 focus:ring-teal-600"
+                className="w-full h-11 px-3 rounded-xl border border-line bg-paper text-ink text-sm focus:outline-none focus:border-teal-700"
               >
                 <option value="">{t('journeys.contactNoneOption')}</option>
                 {acceptedContacts.map((c) => (
@@ -467,47 +548,30 @@ export const SafeJourneyPage: React.FC = () => {
                 <p
                   role="note"
                   data-testid="journey-no-contact-note"
-                  className="text-xs font-medium text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 rounded-xl px-3.5 py-2.5"
+                  className="text-xs text-muted bg-paper border border-line/60 p-2.5 rounded-xl"
                 >
                   {t('journeys.noContactSelectedNote')}
                 </p>
               )}
             </div>
 
-            {/* Optional Short Note Field (max 100 chars) - "Where are you heading? (optional)" */}
-            <div className="space-y-2">
-              <label
-                htmlFor="journey-note-input"
-                className="block text-sm font-bold text-slate-900 dark:text-slate-100"
-              >
-                {t('journeys.noteLabel')}
-              </label>
-              <input
-                id="journey-note-input"
-                data-testid="journey-note-input"
-                type="text"
-                maxLength={100}
-                value={journeyNote}
-                onChange={(e) => setJourneyNote(e.target.value.slice(0, 100))}
-                placeholder={t('journeys.notePlaceholder')}
-                className="w-full min-h-[56px] px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-base focus:outline-none focus:ring-2 focus:ring-teal-600"
-              />
-            </div>
-
-            {/* Start Button (56px target) */}
-            <Button
+            {/* Start Button */}
+            <button
               type="button"
-              variant="primary"
-              fullWidth
               data-testid="journey-start-btn"
               disabled={isSubmitting}
               onClick={handleStartJourney}
-              className="min-h-[56px] text-base font-bold"
+              className="w-full min-h-[52px] px-4 py-3 bg-teal-700 active:bg-teal-800 text-surface font-mono font-bold text-sm uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors"
             >
-              <Footprints className="w-5 h-5 mr-2" aria-hidden="true" />
-              {isSubmitting ? t('journeys.startingBtn') : t('journeys.startBtn')}
-            </Button>
-          </Card>
+              <svg className="w-5 h-5 stroke-current fill-none stroke-2" strokeLinecap="square" strokeLinejoin="miter" viewBox="0 0 24 24">
+                <circle cx="13" cy="4" r="2" />
+                <path d="M7 21l3-7 3 2v6" />
+                <path d="M11 10l3-3 4 2v5" />
+                <path d="M6 12l4-2" />
+              </svg>
+              <span>{isSubmitting ? t('journeys.startingBtn') : t('journeys.startBtn')}</span>
+            </button>
+          </div>
         )}
       </div>
     </PageLayout>

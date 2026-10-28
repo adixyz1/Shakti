@@ -92,6 +92,13 @@
       "when": 1791290000000,
       "tag": "0012_demo_mode_flags",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1791295000000,
+      "tag": "0013_safety_tools",
+      "breakpoints": true
     }
   ]
 }

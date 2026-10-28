@@ -16,6 +16,7 @@ import { ResponderDashboardPage } from './pages/ResponderDashboardPage';
 import { SafeJourneyPage } from './pages/SafeJourneyPage';
 import { SafetyReportsPage } from './pages/SafetyReportsPage';
 import { ResourcesPage } from './pages/ResourcesPage';
+import { SafetyToolsPage } from './pages/SafetyToolsPage';
 import { AdminPage } from './pages/AdminPage';
 import { PolicyPage } from './pages/PolicyPage';
 import { DiscreetTriggersManager } from './components/DiscreetTriggersManager';
@@ -33,10 +34,13 @@ const queryClient = new QueryClient({
   },
 });
 
-const ProtectedRoute: React.FC<{
+import { AccountRequiredPage, type AccountRequiredFeature } from './pages/AccountRequiredPage';
+
+const AccountRequiredRoute: React.FC<{
   children: React.ReactNode;
+  feature?: AccountRequiredFeature;
   allowedRoles?: UserRole[];
-}> = ({ children, allowedRoles }) => {
+}> = ({ children, feature = 'general', allowedRoles }) => {
   const { user, isLoading } = useAuthStore();
 
   if (isLoading) {
@@ -48,7 +52,7 @@ const ProtectedRoute: React.FC<{
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <AccountRequiredPage feature={feature} />;
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
@@ -108,99 +112,84 @@ export function AppRoutes() {
     <>
       <DiscreetTriggersManager />
       <Routes>
-        <Route path="/" element={<WelcomePage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/invite/:token" element={<PublicInvitePage />} />
-      <Route path="/c/:token" element={<ContactAlertPage />} />
-      <Route path="/policy" element={<PolicyPage />} />
-      <Route
-        path="/home"
-        element={
-          <ProtectedRoute>
-            <HomePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/onboarding"
-        element={
-          <ProtectedRoute>
-            <OnboardingPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/consents"
-        element={
-          <ProtectedRoute>
-            <ConsentCenterPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/circle"
-        element={
-          <ProtectedRoute>
-            <TrustedCirclePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/journeys"
-        element={
-          <ProtectedRoute>
-            <SafeJourneyPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/reports"
-        element={
-          <ProtectedRoute>
-            <SafetyReportsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/resources"
-        element={
-          <ProtectedRoute>
-            <ResourcesPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute>
-            <SettingsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/responder"
-        element={
-          <ProtectedRoute allowedRoles={['responder']}>
-            <ResponderDashboardPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/tools"
-        element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminPage />
-          </ProtectedRoute>
-        }
-      />
+        <Route path="/" element={<HomePage />} />
+        <Route path="/home" element={<HomePage />} />
+        <Route path="/welcome" element={<WelcomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/invite/:token" element={<PublicInvitePage />} />
+        <Route path="/c/:token" element={<ContactAlertPage />} />
+        <Route path="/policy" element={<PolicyPage />} />
+        {/* Guest-allowed routes */}
+        <Route path="/resources" element={<ResourcesPage />} />
+        <Route path="/safety-tools" element={<SafetyToolsPage />} />
+        <Route path="/reports" element={<SafetyReportsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+
+        {/* Account-required routes */}
+        <Route
+          path="/circle"
+          element={
+            <AccountRequiredRoute feature="circle">
+              <TrustedCirclePage />
+            </AccountRequiredRoute>
+          }
+        />
+        <Route
+          path="/journeys"
+          element={
+            <AccountRequiredRoute feature="journeys">
+              <SafeJourneyPage />
+            </AccountRequiredRoute>
+          }
+        />
+        <Route
+          path="/consents"
+          element={
+            <AccountRequiredRoute feature="consents">
+              <ConsentCenterPage />
+            </AccountRequiredRoute>
+          }
+        />
+        <Route
+          path="/settings/data"
+          element={
+            <AccountRequiredRoute feature="data">
+              <ConsentCenterPage />
+            </AccountRequiredRoute>
+          }
+        />
+        <Route
+          path="/onboarding"
+          element={
+            <AccountRequiredRoute feature="onboarding">
+              <OnboardingPage />
+            </AccountRequiredRoute>
+          }
+        />
+        <Route
+          path="/responder"
+          element={
+            <AccountRequiredRoute feature="responder" allowedRoles={['responder']}>
+              <ResponderDashboardPage />
+            </AccountRequiredRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <AccountRequiredRoute feature="admin" allowedRoles={['admin']}>
+              <AdminPage />
+            </AccountRequiredRoute>
+          }
+        />
+        <Route
+          path="/admin/tools"
+          element={
+            <AccountRequiredRoute feature="admin" allowedRoles={['admin']}>
+              <AdminPage />
+            </AccountRequiredRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

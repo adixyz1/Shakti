@@ -108,14 +108,14 @@ export const SafetyPulseCard: React.FC<{
   return (
     <Card
       data-testid="safety-pulse-card"
-      className="p-4 text-left border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3"
+      className="p-4 text-left border border-line dark:border-night-line bg-surface dark:bg-night-surface rounded-2xl space-y-3"
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+          <h2 className="text-sm font-bold text-ink dark:text-night-ink">
             {t('pulse.title')}
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-muted dark:text-night-muted">
             {t('pulse.subtitle')}
           </p>
         </div>
@@ -124,7 +124,7 @@ export const SafetyPulseCard: React.FC<{
           data-testid="pulse-dismiss-btn"
           aria-label={t('pulse.skipBtn')}
           onClick={handleDismiss}
-          className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+          className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-xl text-muted dark:text-night-muted hover:bg-paper dark:hover:bg-night"
         >
           <X className="w-4 h-4" aria-hidden="true" />
         </button>
@@ -133,7 +133,7 @@ export const SafetyPulseCard: React.FC<{
       <form onSubmit={handleSubmit} className="space-y-3">
         {/* Question 1: How safe did you feel traveling this week? (1-5) */}
         <div className="space-y-1.5">
-          <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+          <p className="text-xs font-semibold text-ink dark:text-night-ink">
             {t('pulse.q1Label')}
           </p>
           <div className="grid grid-cols-5 gap-2">
@@ -149,7 +149,7 @@ export const SafetyPulseCard: React.FC<{
                   className={`min-h-[44px] rounded-xl font-bold text-sm border transition-colors ${
                     selected
                       ? 'bg-teal-800 text-white border-teal-800 dark:bg-teal-700 dark:border-teal-700'
-                      : 'bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700'
+                      : 'bg-paper dark:bg-night text-ink dark:text-night-ink border-line dark:border-night-line hover:bg-surface'
                   }`}
                 >
                   {score}
@@ -161,7 +161,7 @@ export const SafetyPulseCard: React.FC<{
 
         {/* Question 2: Did you avoid going somewhere because of safety? (Yes/No) */}
         <div className="space-y-1.5">
-          <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+          <p className="text-xs font-semibold text-ink dark:text-night-ink">
             {t('pulse.q2Label')}
           </p>
           <div className="grid grid-cols-2 gap-2">
@@ -173,7 +173,7 @@ export const SafetyPulseCard: React.FC<{
               className={`min-h-[44px] rounded-xl font-semibold text-xs border transition-colors ${
                 avoidedGoingSomewhere
                   ? 'bg-teal-800 text-white border-teal-800 dark:bg-teal-700 dark:border-teal-700'
-                  : 'bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700'
+                  : 'bg-paper dark:bg-night text-ink dark:text-night-ink border-line dark:border-night-line hover:bg-surface'
               }`}
             >
               {t('pulse.yesBtn')}
@@ -186,7 +186,7 @@ export const SafetyPulseCard: React.FC<{
               className={`min-h-[44px] rounded-xl font-semibold text-xs border transition-colors ${
                 !avoidedGoingSomewhere
                   ? 'bg-teal-800 text-white border-teal-800 dark:bg-teal-700 dark:border-teal-700'
-                  : 'bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700'
+                  : 'bg-paper dark:bg-night text-ink dark:text-night-ink border-line dark:border-night-line hover:bg-surface'
               }`}
             >
               {t('pulse.noBtn')}
@@ -195,13 +195,13 @@ export const SafetyPulseCard: React.FC<{
         </div>
 
         {/* Anonymous toggle */}
-        <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+        <label className="flex items-center gap-2 text-xs text-ink dark:text-night-ink cursor-pointer">
           <input
             type="checkbox"
             data-testid="pulse-anonymous-checkbox"
             checked={anonymous}
             onChange={(e) => setAnonymous(e.target.checked)}
-            className="w-4 h-4 rounded accent-teal-700"
+            className="w-4 h-4 rounded-xl accent-teal-800 border-line"
           />
           <span>{t('pulse.anonymousLabel')}</span>
         </label>
@@ -211,7 +211,7 @@ export const SafetyPulseCard: React.FC<{
             type="button"
             data-testid="pulse-skip-btn"
             onClick={handleDismiss}
-            className="min-h-[44px] px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="min-h-[44px] px-3 py-2 rounded-xl text-xs font-semibold text-muted dark:text-night-muted hover:bg-paper dark:hover:bg-night"
           >
             {t('pulse.skipBtn')}
           </button>

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getDb } from '../core/db';
 import {
   checkAndRecordReportDailyCap,
+  optionalAuth,
   reportRateLimitMiddleware,
   requireAuth,
   requireRole,
@@ -26,10 +27,10 @@ const createReportSchema = z.object({
   anonymous: z.boolean().optional().default(true),
 });
 
-// POST /api/reports (authenticated users; rate-limited; anonymous reports store NO user_id and logs do not link them)
+// POST /api/reports (guest-allowed or authenticated; rate-limited per IP; anonymous reports store NO user_id)
 reportsRouter.post(
   '/reports',
-  requireAuth,
+  optionalAuth,
   reportRateLimitMiddleware,
   async (req: Request, res: Response) => {
     const parsed = createReportSchema.safeParse(req.body || {});
@@ -40,7 +41,7 @@ reportsRouter.post(
       return;
     }
 
-    const isAnon = parsed.data.anonymous !== false;
+    const isAnon = !req.user || parsed.data.anonymous !== false;
     const forwardedIp =
       typeof req.headers['x-forwarded-for'] === 'string'
         ? req.headers['x-forwarded-for'].split(',')[0].trim()
@@ -56,9 +57,12 @@ reportsRouter.post(
 
     try {
       const db = getDb();
-      // If anonymous is true, do not pass req.user.id into the service at all
+      // If anonymous is true or guest, do not pass user_id into the service at all
       const effectiveUserId = isAnon ? null : req.user!.id;
-      const report = await createSafetyReport(db, effectiveUserId, parsed.data);
+      const report = await createSafetyReport(db, effectiveUserId, {
+        ...parsed.data,
+        anonymous: isAnon,
+      });
       res.status(201).json({ report });
     } catch (err) {
       if (err instanceof HttpError) {
@@ -94,10 +98,9 @@ const reportIdParamSchema = z.object({
   id: z.string().trim().min(1).max(128),
 });
 
-// GET /api/safety-layer -> Aggregated counts per ~100m grid cell (3 decimals) with >= K reports
+// GET /api/safety-layer -> Aggregated counts per ~100m grid cell (3 decimals) with >= K reports (guest-allowed)
 reportsRouter.get(
   '/safety-layer',
-  requireAuth,
   async (req: Request, res: Response) => {
     const queryParsed = safetyLayerQuerySchema.safeParse(req.query);
     if (!queryParsed.success) {

@@ -45,6 +45,7 @@ import {
   detectSmsPlatform,
   flushOfflineAlertQueue,
   getCachedEmergencyContacts,
+  getGuestEmergencyContacts,
   listQueuedAlerts,
   subscribeQueueChange,
   subscribeQueueFlushed,
@@ -58,6 +59,8 @@ import { useTriggerSettingsStore } from '../store/triggerSettingsStore';
 import { DisguiseCalculator } from '../components/DisguiseCalculator';
 import { SafetyPulseCard } from '../components/SafetyPulseCard';
 import { DemoSimulatePanel } from '../components/DemoSimulatePanel';
+import { GuestContactsCard } from '../components/GuestContactsCard';
+import { SignInLaterOfferCard } from '../components/SignInLaterOfferCard';
 
 const HOLD_DURATION_MS = 2000;
 const HOLD_TICK_MS = 100;
@@ -94,6 +97,11 @@ export const HomePage: React.FC = () => {
   const [cachedContacts, setCachedContacts] = useState<
     CachedEmergencyContact[]
   >([]);
+  const [guestContacts, setGuestContacts] = useState<
+    CachedEmergencyContact[]
+  >([]);
+  const [isCapturingGuestLocation, setIsCapturingGuestLocation] = useState(false);
+  const [guestLocationError, setGuestLocationError] = useState<string | null>(null);
   const [notifiableCount, setNotifiableCount] = useState<number>(0);
   const [locationConsentGranted, setLocationConsentGranted] =
     useState<boolean>(false);
@@ -247,8 +255,54 @@ export const HomePage: React.FC = () => {
   useEffect(() => {
     if (user) {
       void loadSafetyOverview();
+    } else {
+      const loadGuestData = async () => {
+        setIsInitialLoading(true);
+        try {
+          const guest = await getGuestEmergencyContacts();
+          setGuestContacts(guest);
+          setNotifiableCount(guest.length);
+        } catch {
+          // ignore
+        } finally {
+          setIsInitialLoading(false);
+        }
+      };
+      void loadGuestData();
     }
   }, [user, loadSafetyOverview]);
+
+  const handleGuestIncludeLocation = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setGuestLocationError(t('guestSos.locationUnavailable'));
+      return;
+    }
+    setIsCapturingGuestLocation(true);
+    setGuestLocationError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocationConsentGranted(true);
+        const sample: LocationSampleDto = {
+          id: `guest_loc_${Date.now()}`,
+          incident_id: incident?.id || 'guest',
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy_m: pos.coords.accuracy ?? null,
+          captured_at: new Date().toISOString(),
+          expires_at: Date.now() + 600000,
+        };
+        setLatestLocation(sample);
+        setLocationStatus('active');
+        setIsCapturingGuestLocation(false);
+      },
+      (err) => {
+        setLocationStatus('unavailable');
+        setGuestLocationError(err?.message || t('guestSos.locationFailed'));
+        setIsCapturingGuestLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   // Listen to unified triggerSos(source) calls
   useEffect(() => {
@@ -269,7 +323,10 @@ export const HomePage: React.FC = () => {
       }
       setSmsComposerOpened(false);
       setSmsConfirmedAt(null);
-      setCancelSecondsLeft(user?.cancel_window_seconds ?? 5);
+      const defaultSec = user
+        ? (user.cancel_window_seconds ?? 5)
+        : useTriggerSettingsStore.getState().guestCancelWindowSeconds;
+      setCancelSecondsLeft(defaultSec);
       setShowPinKeypad(false);
       setPinDigits('');
       setPinError(null);
@@ -373,13 +430,34 @@ export const HomePage: React.FC = () => {
       return;
     }
 
-    const windowSec = user?.cancel_window_seconds ?? 5;
+    const windowSec = user
+      ? (user.cancel_window_seconds ?? 5)
+      : useTriggerSettingsStore.getState().guestCancelWindowSeconds;
     setCancelSecondsLeft(windowSec);
 
     const intervalId = setInterval(() => {
       setCancelSecondsLeft((prev) => {
         if (prev <= 1) {
           clearInterval(intervalId);
+          if (incident.id.startsWith('guest_')) {
+            setIncident((prevInc) =>
+              prevInc
+                ? {
+                    ...prevInc,
+                    status: 'ACTIVE',
+                    activated_at: new Date().toISOString(),
+                  }
+                : null
+            );
+            setSentAtTime(
+              new Date().toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            );
+            return 0;
+          }
+
           if (!incident.id.startsWith('queued_')) {
             // Sync incident status once cancel window elapses
             void incidentsApi
@@ -415,7 +493,8 @@ export const HomePage: React.FC = () => {
     if (
       !incident ||
       !isOpenIncident(incident) ||
-      incident.id.startsWith('queued_')
+      incident.id.startsWith('queued_') ||
+      incident.id.startsWith('guest_')
     ) {
       return;
     }
@@ -509,6 +588,10 @@ export const HomePage: React.FC = () => {
   // Task 6: Location capture ONLY during an open or queued alert and ONLY if location consent is granted.
   // Clears latestLocation immediately when no alert is active or queued.
   useEffect(() => {
+    if (!user) {
+      return;
+    }
+
     const hasActiveOrQueuedAlert =
       (incident && isOpenIncident(incident)) || queuedAlerts.length > 0;
 
@@ -657,6 +740,24 @@ export const HomePage: React.FC = () => {
   const handleCancelClick = async () => {
     if (!incident) return;
 
+    // Guest mode cancellation
+    if (incident.id.startsWith('guest_') || !user) {
+      const guestPinHash = useTriggerSettingsStore.getState().guestCancelPinHash;
+      if (guestPinHash) {
+        setShowPinKeypad(true);
+        setPinDigits('');
+        setPinError(null);
+        return;
+      }
+      setIncident({
+        ...incident,
+        status: 'CANCELLED',
+        closed_at: new Date().toISOString(),
+      });
+      setShowPinKeypad(false);
+      return;
+    }
+
     // Task 4: Cancel while queued offline — remove alert from queue so it is never sent
     if (incident.id.startsWith('queued_') || queuedAlerts.length > 0) {
       setIsCancelling(true);
@@ -716,6 +817,25 @@ export const HomePage: React.FC = () => {
       return;
     }
 
+    if (incident.id.startsWith('guest_') || !user) {
+      const isValid = await useTriggerSettingsStore
+        .getState()
+        .verifyGuestCancelPin(pinDigits);
+      if (!isValid) {
+        setPinError(t('sos.cancelWindow.pinErrorInvalid'));
+        setPinDigits('');
+        return;
+      }
+      setIncident({
+        ...incident,
+        status: 'CANCELLED',
+        closed_at: new Date().toISOString(),
+      });
+      setShowPinKeypad(false);
+      setPinDigits('');
+      return;
+    }
+
     if (incident.id.startsWith('queued_')) {
       await cancelQueuedAlert(incident.client_request_id);
       setIncident({
@@ -755,6 +875,9 @@ export const HomePage: React.FC = () => {
     setIncident((prev) =>
       prev ? { ...prev, emergency_type: typeKey } : prev
     );
+    if (incident.id.startsWith('guest_')) {
+      return;
+    }
     if (incident.id.startsWith('queued_')) {
       await updateQueuedAlertEmergencyType(
         incident.client_request_id,
@@ -772,6 +895,15 @@ export const HomePage: React.FC = () => {
 
   const handleMarkSafe = async () => {
     if (!incident) return;
+    if (incident.id.startsWith('guest_') || !user) {
+      setIncident({
+        ...incident,
+        status: 'RESOLVED',
+        closed_at: new Date().toISOString(),
+      });
+      return;
+    }
+
     if (incident.id.startsWith('queued_')) {
       await cancelQueuedAlert(incident.client_request_id);
       setIncident({
@@ -796,8 +928,6 @@ export const HomePage: React.FC = () => {
     }
   };
 
-  if (!user) return null;
-
   if (
     disguiseEnabled &&
     disguiseSequenceHash &&
@@ -812,6 +942,9 @@ export const HomePage: React.FC = () => {
       />
     );
   }
+
+  const isGuestMode = !user;
+  const isGuestIncident = Boolean(incident?.id?.startsWith('guest_'));
 
   const onlineEligibleContacts: CachedEmergencyContact[] = contacts
     .filter((c) => c.status === 'accepted' && c.permissions.receives_sos)
@@ -837,17 +970,17 @@ export const HomePage: React.FC = () => {
     (q) => q.status === 'needs_reauth'
   );
 
-  const smsLocationSample = latestLocation
+  const smsLocationSample = (locationConsentGranted && latestLocation)
     ? {
         lat: latestLocation.lat,
         lng: latestLocation.lng,
         accuracy_m: latestLocation.accuracy_m,
         captured_at: latestLocation.captured_at,
       }
-    : activeQueuedEntry?.location || null;
+    : (locationConsentGranted ? activeQueuedEntry?.location : null) || null;
 
   const smsBody = buildEmergencySmsBody({
-    userName: user.name,
+    userName: user?.name || 'Guest',
     location: smsLocationSample,
     triggeredAtIso:
       incident?.created_at || activeQueuedEntry?.client_created_at,
@@ -861,14 +994,14 @@ export const HomePage: React.FC = () => {
   );
 
   const renderSmsFallbackPanel = () => {
-    if (!isCurrentIncidentQueued && !serverError) {
+    if (!isCurrentIncidentQueued && !serverError && !isGuestIncident) {
       return null;
     }
 
     return (
       <Card
         data-testid="sms-fallback-panel"
-        className="border-2 border-amber-500 dark:border-amber-500 space-y-4 bg-amber-50/70 dark:bg-amber-950/40"
+        className="border-2 border-amber-500 dark:border-amber-500 space-y-4 bg-amber-50/70 dark:bg-amber-950/40 text-left"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-2.5">
@@ -878,23 +1011,88 @@ export const HomePage: React.FC = () => {
                 data-testid="honest-queued-status-text"
                 className="text-base font-bold text-amber-950 dark:text-amber-100"
               >
-                {t('offline.queuedBannerText')}
+                {isGuestMode
+                  ? t('guestSos.activeTitle')
+                  : t('offline.queuedBannerText')}
               </h2>
               <p className="text-xs text-amber-900 dark:text-amber-200">
-                {t('offline.smsFallbackHonestNote')}
+                {isGuestMode
+                  ? t('guestSos.smsNote')
+                  : t('offline.smsFallbackHonestNote')}
               </p>
             </div>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            data-testid="flush-queue-now-btn"
-            onClick={() => void flushOfflineAlertQueue()}
-          >
-            <RefreshCw className="w-4 h-4 mr-1.5" />
-            {t('sos.error.retryBtn')}
-          </Button>
+          {!isGuestMode && (
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="flush-queue-now-btn"
+              onClick={() => void flushOfflineAlertQueue()}
+            >
+              <RefreshCw className="w-4 h-4 mr-1.5" />
+              {t('sos.error.retryBtn')}
+            </Button>
+          )}
         </div>
+
+        {/* Note if guest mode */}
+        {isGuestMode && (
+          <div className="space-y-3">
+            <div
+              data-testid="guest-plain-sms-note"
+              className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-amber-300 dark:border-amber-700 text-xs font-semibold text-slate-800 dark:text-slate-200"
+            >
+              {t('guestSos.smsNote')}
+            </div>
+
+            {/* Guest Location Tap Action: only requested on user tap */}
+            {latestLocation ? (
+              <div
+                data-testid="guest-location-included-badge"
+                className="p-3 bg-teal-50 dark:bg-teal-950/40 rounded-xl border border-teal-300 dark:border-teal-700 text-xs font-semibold text-teal-900 dark:text-teal-200 flex items-center justify-between"
+              >
+                <span>{t('guestSos.locationIncluded')}</span>
+                <span className="font-mono">
+                  {latestLocation.lat.toFixed(4)}, {latestLocation.lng.toFixed(4)}
+                </span>
+              </div>
+            ) : (
+              <div className="space-y-1.5" data-testid="guest-location-action-area">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  data-testid="guest-include-location-btn"
+                  isLoading={isCapturingGuestLocation}
+                  onClick={handleGuestIncludeLocation}
+                  className="w-full min-h-[48px] justify-center"
+                >
+                  <MapPin className="w-4 h-4 mr-2 text-teal-700 dark:text-teal-400" />
+                  {t('guestSos.includeLocationBtn')}
+                </Button>
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  {t('guestSos.locationConsentTapNote')}
+                </p>
+                {guestLocationError && (
+                  <p role="alert" className="text-xs text-rose-600 dark:text-rose-400 font-medium">
+                    {guestLocationError}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Loud Siren Trigger for Guest in Distress without signing in */}
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="guest-loud-siren-btn"
+              onClick={handleLoudAlarmClick}
+              className="w-full min-h-[48px] justify-center border-amber-500/70 text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+            >
+              <Bell className="w-4 h-4 mr-2 text-amber-600 dark:text-amber-400" />
+              {t('guestSos.sirenBtn')}
+            </Button>
+          </div>
+        )}
 
         {/* Task 5: Auth while offline -> if 401 refresh failed, tell user to sign in and never drop alert */}
         {needsReauthForQueue && (
@@ -1040,7 +1238,7 @@ export const HomePage: React.FC = () => {
           <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
             {t('sos.emergencyType.title')}
           </h2>
-          <p className="text-xs text-slate-600 dark:text-slate-400">
+          <p className="text-xs text-slate-600 dark:text-slate-300">
             {t('sos.emergencyType.subtitle')}
           </p>
         </div>
@@ -1079,7 +1277,7 @@ export const HomePage: React.FC = () => {
           </h2>
           <span
             data-testid="sharing-auto-stop"
-            className="text-xs text-slate-500 dark:text-slate-400"
+            className="text-xs text-slate-600 dark:text-slate-300"
           >
             {t('sos.sharingPreview.autoStop', { minutes: autoExpireMinutes })}
           </span>
@@ -1087,7 +1285,7 @@ export const HomePage: React.FC = () => {
 
         {/* Who will be alerted */}
         <div className="space-y-1.5">
-          <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+          <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
             {t('sos.sharingPreview.whoLabel')}
           </p>
           {eligibleSosContacts.length > 0 ? (
@@ -1271,19 +1469,19 @@ export const HomePage: React.FC = () => {
             data-testid="cancel-window-screen"
             className="space-y-6"
           >
-            <Card className="border-2 border-amber-500 dark:border-amber-500 space-y-5 text-center">
+            <Card className="border border-rose-200 dark:border-rose-900/50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl space-y-5 text-center shadow-xl p-6">
               <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                <p className="text-xs font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
                   {t('sos.cancelWindow.kicker')}
                 </p>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                   {incident.id.startsWith('queued_')
                     ? t('offline.queuedBannerText')
                     : t('sos.cancelWindow.title')}
                 </h1>
                 <p
                   data-testid="cancel-countdown"
-                  className="text-3xl font-extrabold font-mono tabular-nums text-rose-700 dark:text-rose-400"
+                  className="text-4xl font-extrabold font-mono tabular-nums text-rose-700 dark:text-rose-400 py-1"
                 >
                   {t('sos.cancelWindow.countdown', {
                     seconds: cancelSecondsLeft,
@@ -1306,13 +1504,13 @@ export const HomePage: React.FC = () => {
               ) : (
                 <div
                   data-testid="pin-keypad"
-                  className="space-y-4 pt-2 border-t border-slate-200 dark:border-slate-800 text-left"
+                  className="space-y-4 pt-3 border-t border-slate-200 dark:border-slate-800 text-left"
                 >
                   <div className="text-center space-y-1">
                     <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
                       {t('sos.cancelWindow.pinTitle')}
                     </h2>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                    <p className="text-xs text-slate-600 dark:text-slate-300">
                       {t('sos.cancelWindow.pinSubtitle')}
                     </p>
                   </div>
@@ -1321,7 +1519,7 @@ export const HomePage: React.FC = () => {
                   <div
                     aria-label="Entered PIN digits"
                     data-testid="pin-display"
-                    className="min-h-[56px] rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 flex items-center justify-center text-2xl font-mono tracking-widest text-slate-900 dark:text-slate-100"
+                    className="min-h-[56px] rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 flex items-center justify-center text-2xl font-mono tracking-widest text-slate-900 dark:text-slate-100 shadow-inner"
                   >
                     {pinDigits.length > 0
                       ? '●'.repeat(pinDigits.length)
@@ -1339,7 +1537,7 @@ export const HomePage: React.FC = () => {
                   )}
 
                   {/* Large Numeric Keypad Grid (56px targets) */}
-                  <div className="grid grid-cols-3 gap-2.5">
+                  <div className="grid grid-cols-3 gap-2">
                     {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(
                       (digit) => (
                         <button
@@ -1352,7 +1550,7 @@ export const HomePage: React.FC = () => {
                               setPinError(null);
                             }
                           }}
-                          className="min-h-[56px] rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xl font-bold text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+                          className="min-h-[56px] rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-xl font-bold text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 transition-colors shadow-xs"
                         >
                           {digit}
                         </button>
@@ -1364,7 +1562,7 @@ export const HomePage: React.FC = () => {
                         setPinDigits('');
                         setPinError(null);
                       }}
-                      className="min-h-[56px] rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+                      className="min-h-[56px] rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 transition-colors"
                     >
                       {t('sos.cancelWindow.pinClear')}
                     </button>
@@ -1377,7 +1575,7 @@ export const HomePage: React.FC = () => {
                           setPinError(null);
                         }
                       }}
-                      className="min-h-[56px] rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xl font-bold text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+                      className="min-h-[56px] rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-xl font-bold text-slate-900 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 transition-colors shadow-xs"
                     >
                       0
                     </button>
@@ -1388,7 +1586,7 @@ export const HomePage: React.FC = () => {
                         setPinDigits((prev) => prev.slice(0, -1));
                         setPinError(null);
                       }}
-                      className="min-h-[56px] rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 inline-flex items-center justify-center text-slate-800 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+                      className="min-h-[56px] rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 inline-flex items-center justify-center text-slate-700 dark:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 transition-colors"
                     >
                       <Delete className="w-5 h-5" />
                     </button>
@@ -1435,109 +1633,275 @@ export const HomePage: React.FC = () => {
               data-testid="live-status-screen"
               className="space-y-6"
             >
-              {/* Prominent Call 112 Now Prompt when needs_user_action is true */}
-              {incident.needs_user_action && (
-                <div
-                  role="alert"
-                  data-testid="needs-user-action-banner"
-                  className="rounded-2xl border-2 border-rose-600 bg-rose-50 dark:bg-rose-950/70 p-5 space-y-4"
-                >
-                  <div className="flex items-start gap-3">
-                    <ShieldAlert className="w-6 h-6 text-rose-700 dark:text-rose-400 shrink-0 mt-0.5" />
-                    <div className="space-y-1">
-                      <h2 className="text-lg font-bold text-rose-950 dark:text-rose-100">
-                        {t('sos.live.needsActionTitle')}
-                      </h2>
-                      <p className="text-sm text-rose-900 dark:text-rose-200">
-                        {t('sos.live.needsActionBody')}
-                      </p>
+              {isGuestIncident ? (
+                <>
+                  <div
+                    data-testid="guest-active-alert-banner"
+                    className="w-full bg-rose-700/95 dark:bg-rose-900/95 backdrop-blur-md border border-rose-800 dark:border-rose-700/60 p-4 rounded-2xl flex items-center justify-between text-white shadow-xl"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+                      <div>
+                        <h1
+                          data-testid="live-status-heading"
+                          className="text-lg font-bold text-white tracking-tight"
+                        >
+                          {t('guestSos.activeTitle')}
+                        </h1>
+                        <p className="text-xs text-white/90">
+                          {t('guestSos.activeSubtitle')}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <a
-                    href="tel:112"
-                    data-testid="call-112-now-btn"
-                    className="min-h-[56px] w-full px-6 py-3.5 rounded-2xl font-bold text-base bg-rose-700 text-white hover:bg-rose-800 inline-flex items-center justify-center gap-3 shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose-500/50"
-                  >
-                    <PhoneCall className="w-5 h-5" />
-                    {t('sos.live.call112NowBtn')}
-                  </a>
-                </div>
-              )}
 
-              {/* Plain-Language Live Status Card */}
-              <Card className="border-2 border-teal-600 dark:border-teal-500 space-y-5">
-                <div className="flex items-start gap-3">
-                  <ShieldCheck className="w-7 h-7 text-teal-700 dark:text-teal-400 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    {incident.status !== 'ACTIVE' && (
-                      <p
-                        data-testid="contacts-notified-badge"
-                        className="text-xs font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400"
+                  {renderSmsFallbackPanel()}
+
+                  <div className="space-y-2.5 pt-2">
+                    <Button
+                      variant="outline"
+                      data-testid="im-safe-btn"
+                      isLoading={isResolving}
+                      fullWidth
+                      onClick={() => void handleMarkSafe()}
+                      className="border-2 border-teal-700 text-teal-700 hover:bg-teal-700/10 min-h-[48px]"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-teal-700 mr-2" />
+                      {t('guestSos.resolveAlert')}
+                    </Button>
+                  </div>
+
+                  {renderEmergencyTypeChips()}
+                  {renderSharingPreviewAndLocation()}
+                </>
+              ) : (
+                <>
+                  {/* Prominent Call 112 Now Prompt when needs_user_action is true */}
+                  {incident.needs_user_action && (
+                    <div
+                      role="alert"
+                      data-testid="needs-user-action-banner"
+                      className="rounded-2xl border-2 border-rose-600 bg-rose-50 dark:bg-rose-950/70 p-5 space-y-4"
+                    >
+                      <div className="flex items-start gap-3">
+                        <ShieldAlert className="w-6 h-6 text-rose-700 dark:text-rose-400 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <h2 className="text-lg font-bold text-rose-950 dark:text-rose-100">
+                            {t('sos.live.needsActionTitle')}
+                          </h2>
+                          <p className="text-sm text-rose-900 dark:text-rose-200">
+                            {t('sos.live.needsActionBody')}
+                          </p>
+                        </div>
+                      </div>
+                      <a
+                        href="tel:112"
+                        data-testid="call-112-now-btn"
+                        className="min-h-[56px] w-full px-6 py-3.5 rounded-2xl font-bold text-base bg-rose-700 text-white hover:bg-rose-800 inline-flex items-center justify-center gap-3 shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose-500/50"
                       >
-                        {t('sos.live.contactsNotifiedBadge')}
-                      </p>
-                    )}
-                    <h1
-                      data-testid="live-status-heading"
-                      className="text-2xl font-bold text-slate-900 dark:text-slate-50"
+                        <PhoneCall className="w-5 h-5" />
+                        {t('sos.live.call112NowBtn')}
+                      </a>
+                    </div>
+                  )}
+
+                  {/* Live Status Header Banner */}
+                  <div className="w-full bg-rose-700/95 dark:bg-rose-900/95 backdrop-blur-md border border-rose-800 dark:border-rose-700/60 p-4 rounded-2xl flex items-center justify-between text-white shadow-xl">
+                    <div className="flex items-center gap-3">
+                      <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+                      <div>
+                        <h1
+                          data-testid="live-status-heading"
+                          className="text-lg font-bold text-white tracking-tight"
+                        >
+                          {incident.status === 'RESPONDING'
+                            ? t('sos.live.statusRespondingTitle')
+                            : incident.status === 'ACKNOWLEDGED'
+                            ? t('sos.live.statusAcknowledgedTitle')
+                            : incident.status === 'ESCALATED'
+                            ? t('sos.live.statusEscalatedTitle')
+                            : incident.status === 'NOTIFIED'
+                            ? t('sos.live.statusNotifiedTitle')
+                            : t('sos.live.statusActiveTitle')}
+                        </h1>
+                        <p className="text-xs text-white/90">
+                          {incident.status === 'RESPONDING'
+                            ? t('sos.live.statusRespondingBody')
+                            : incident.status === 'ACKNOWLEDGED'
+                            ? t('sos.live.statusAcknowledgedBody')
+                            : incident.status === 'ESCALATED'
+                            ? t('sos.live.statusEscalatedBody')
+                            : incident.status === 'NOTIFIED'
+                            ? t('sos.live.statusNotifiedBody')
+                            : t('sos.live.statusActiveBody')}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      data-testid="contacts-notified-badge"
+                      className="px-2.5 py-1 bg-white text-rose-800 text-xs font-bold uppercase tracking-widest rounded-lg tabular-nums shadow-xs"
                     >
-                      {incident.status === 'RESPONDING'
-                        ? t('sos.live.statusRespondingTitle')
-                        : incident.status === 'ACKNOWLEDGED'
-                        ? t('sos.live.statusAcknowledgedTitle')
-                        : incident.status === 'ESCALATED'
-                        ? t('sos.live.statusEscalatedTitle')
-                        : incident.status === 'NOTIFIED'
-                        ? t('sos.live.statusNotifiedTitle')
-                        : t('sos.live.statusActiveTitle')}
-                    </h1>
-                    <p className="text-sm text-slate-600 dark:text-slate-300">
-                      {incident.status === 'RESPONDING'
-                        ? t('sos.live.statusRespondingBody')
-                        : incident.status === 'ACKNOWLEDGED'
-                        ? t('sos.live.statusAcknowledgedBody')
-                        : incident.status === 'ESCALATED'
-                        ? t('sos.live.statusEscalatedBody')
-                        : incident.status === 'NOTIFIED'
-                        ? t('sos.live.statusNotifiedBody')
-                        : t('sos.live.statusActiveBody')}
-                    </p>
+                      {t('sos.live.statusNotifiedTitle')}
+                    </span>
                   </div>
-                </div>
 
-                {/* Primary Safety Actions: I'm safe + Call 112 / Call 181 */}
-                <div className="space-y-3 pt-2">
-                  <BigButton
-                    variant="primary"
-                    data-testid="im-safe-btn"
-                    isLoading={isResolving}
-                    onClick={() => void handleMarkSafe()}
-                  >
-                    <CheckCircle2 className="w-5 h-5" />
-                    {t('sos.live.imSafeBtn')}
-                  </BigButton>
+                  {/* Status Ladder (Confirmed Operational Steps) */}
+                  <Card className="border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl p-5 shadow-xl space-y-4">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                      <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                        {t('sos.live.statusLadderTitle', { defaultValue: 'Status Ladder' })}
+                      </h2>
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        {t('sos.live.confirmedSteps', { defaultValue: 'Confirmed Steps' })}
+                      </span>
+                    </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <a
-                      href="tel:112"
-                      className="min-h-[56px] px-6 py-3.5 rounded-2xl font-semibold text-base bg-rose-700 text-white hover:bg-rose-800 inline-flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose-500/50"
-                    >
-                      <PhoneCall className="w-5 h-5" />
-                      {t('sos.live.call112Btn')}
-                    </a>
-                    <a
-                      href="tel:181"
-                      className="min-h-[56px] px-6 py-3.5 rounded-2xl font-semibold text-base border-2 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 inline-flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/50"
-                    >
-                      <PhoneCall className="w-5 h-5" />
-                      {t('sos.live.call181Btn')}
-                    </a>
-                  </div>
-                </div>
-              </Card>
+                    <ol className="relative space-y-3 pl-5 border-l-2 border-teal-700 ml-2">
+                      <li className="relative">
+                        <div aria-hidden="true" className="absolute -left-[27px] top-1.5 w-3 h-3 bg-teal-700 border-2 border-white dark:border-slate-900 rounded-full" />
+                        <div className="flex flex-col">
+                          <div className="flex items-baseline justify-between">
+                            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                              {t('sos.live.stepSaved', { defaultValue: 'Saved on this phone' })}
+                            </span>
+                            <span className="text-xs font-mono text-slate-600 dark:text-slate-300 tabular-nums">
+                              {sentAtTime || 'Confirmed'}
+                            </span>
+                          </div>
+                          <span className="text-xs text-slate-600 dark:text-slate-300">
+                            {t('sos.live.stepSavedSub', { defaultValue: 'Local encrypted emergency record confirmed' })}
+                          </span>
+                        </div>
+                      </li>
 
-              {renderEmergencyTypeChips()}
-              {renderSharingPreviewAndLocation()}
+                      <li className="relative">
+                        <div
+                          aria-hidden="true"
+                          className="absolute -left-[27px] top-1.5 w-3 h-3 border-2 border-white dark:border-slate-900 bg-teal-700 rounded-full"
+                        />
+                        <div className="flex flex-col">
+                          <div className="flex items-baseline justify-between">
+                            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                              {t('sos.live.stepSent', { defaultValue: 'Sent to circle & responders' })}
+                            </span>
+                            <span className="text-xs font-mono text-slate-600 dark:text-slate-300 tabular-nums">
+                              Relayed
+                            </span>
+                          </div>
+                          <span className="text-xs text-slate-600 dark:text-slate-300">
+                            {t('sos.live.stepSentSub', { defaultValue: 'Broadcast via SMS and cellular data relays' })}
+                          </span>
+                        </div>
+                      </li>
+
+                      <li className="relative">
+                        <div
+                          aria-hidden="true"
+                          className={`absolute -left-[27px] top-1.5 w-3 h-3 border-2 border-white dark:border-slate-900 rounded-full ${
+                            incident.status === 'NOTIFIED' ||
+                            incident.status === 'ACKNOWLEDGED' ||
+                            incident.status === 'RESPONDING' ||
+                            incident.status === 'ESCALATED'
+                              ? 'bg-teal-700'
+                              : 'bg-slate-200 dark:bg-slate-700 border-slate-400'
+                          }`}
+                        />
+                        <div className="flex flex-col">
+                          <div className="flex items-baseline justify-between">
+                            <span
+                              className={`text-sm ${
+                                incident.status === 'NOTIFIED' ||
+                                incident.status === 'ACKNOWLEDGED' ||
+                                incident.status === 'RESPONDING' ||
+                                incident.status === 'ESCALATED'
+                                  ? 'font-bold text-slate-900 dark:text-slate-100'
+                                  : 'font-normal text-slate-500 dark:text-slate-400'
+                              }`}
+                            >
+                              {t('sos.live.stepDelivered', { defaultValue: 'Delivered to emergency circle' })}
+                            </span>
+                            <span className="text-xs font-mono text-slate-600 dark:text-slate-300 tabular-nums">
+                              {eligibleSosContacts.length} contacts
+                            </span>
+                          </div>
+                          <span className="text-xs text-slate-600 dark:text-slate-300">
+                            {t('sos.live.stepDeliveredSub', { defaultValue: 'SMS alerts delivered with live link' })}
+                          </span>
+                        </div>
+                      </li>
+
+                      <li className="relative">
+                        <div
+                          aria-hidden="true"
+                          className={`absolute -left-[27px] top-1.5 w-3 h-3 border-2 border-white dark:border-slate-900 rounded-full ${
+                            incident.status === 'ACKNOWLEDGED' || incident.status === 'RESPONDING'
+                              ? 'bg-teal-700'
+                              : 'bg-slate-200 dark:bg-slate-700 border-slate-400'
+                          }`}
+                        />
+                        <div className="flex flex-col">
+                          <div className="flex items-baseline justify-between">
+                            <span
+                              className={`text-sm ${
+                                incident.status === 'ACKNOWLEDGED' || incident.status === 'RESPONDING'
+                                  ? 'font-bold text-slate-900 dark:text-slate-100'
+                                  : 'font-normal text-slate-500 dark:text-slate-400'
+                              }`}
+                            >
+                              {t('sos.live.stepAck', { defaultValue: 'Acknowledged' })}
+                            </span>
+                            <span className="text-xs font-mono text-slate-600 dark:text-slate-300 tabular-nums">
+                              {incident.status === 'ACKNOWLEDGED' || incident.status === 'RESPONDING'
+                                ? 'Seen'
+                                : 'Awaiting'}
+                            </span>
+                          </div>
+                          <span className="text-xs text-slate-600 dark:text-slate-300">
+                            {incident.status === 'ACKNOWLEDGED' || incident.status === 'RESPONDING'
+                              ? t('sos.live.statusAcknowledgedTitle')
+                              : t('sos.live.stepAckSub', { defaultValue: 'Awaiting first contact or responder open' })}
+                          </span>
+                        </div>
+                      </li>
+                    </ol>
+
+                    {/* Primary Safety Actions: I'm safe + Call 112 / Call 181 */}
+                    <div className="space-y-2.5 pt-3 border-t border-slate-200 dark:border-slate-800">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <a
+                          href="tel:112"
+                          className="min-h-[48px] px-5 py-2.5 rounded-xl font-bold text-sm bg-rose-700 text-white hover:bg-rose-800 inline-flex items-center justify-center gap-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 transition-colors"
+                        >
+                          <PhoneCall className="w-4 h-4" />
+                          {t('sos.live.call112Btn')}
+                        </a>
+                        <a
+                          href="tel:181"
+                          className="min-h-[48px] px-5 py-2.5 rounded-xl font-bold text-sm bg-teal-700 text-white hover:bg-teal-800 inline-flex items-center justify-center gap-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 transition-colors"
+                        >
+                          <PhoneCall className="w-4 h-4" />
+                          {t('sos.live.call181Btn')}
+                        </a>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        data-testid="im-safe-btn"
+                        isLoading={isResolving}
+                        fullWidth
+                        onClick={() => void handleMarkSafe()}
+                        className="border-2 border-teal-700 text-teal-700 hover:bg-teal-700/10 min-h-[48px]"
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-teal-700" />
+                        {t('sos.live.imSafeBtn')}
+                      </Button>
+                    </div>
+                  </Card>
+
+                  {renderEmergencyTypeChips()}
+                  {renderSharingPreviewAndLocation()}
+                </>
+              )}
             </section>
           )}
 
@@ -1552,7 +1916,7 @@ export const HomePage: React.FC = () => {
               data-testid="closed-status-screen"
               className="space-y-6"
             >
-              <Card className="space-y-4 text-center">
+              <Card className="space-y-4 text-center bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-xl rounded-2xl p-6">
                 <CheckCircle2 className="w-10 h-10 text-teal-700 dark:text-teal-400 mx-auto" />
                 <div className="space-y-1">
                   <h1 className="text-xl font-bold text-slate-900 dark:text-slate-50">
@@ -1602,12 +1966,21 @@ export const HomePage: React.FC = () => {
           >
             <div className="space-y-1">
               <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                {t('home.welcomeBack', { name: user.name })}
+                {user ? t('home.welcomeBack', { name: user.name }) : 'SAATHI Emergency SOS'}
               </h1>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
+              <p className="text-sm text-slate-600 dark:text-slate-300">
                 {t('sos.buttonInstruction')}
               </p>
             </div>
+
+            {/* Offer to migrate local device contacts after sign-in */}
+            {user && (
+              <SignInLaterOfferCard
+                cachedContacts={cachedContacts}
+                onlineContacts={contacts}
+                onMigrated={loadSafetyOverview}
+              />
+            )}
 
             {disguiseEnabled && disguiseUnlockedSession && (
               <div className="flex justify-center">
@@ -1622,38 +1995,16 @@ export const HomePage: React.FC = () => {
               </div>
             )}
 
-            {/* Huge One-Handed Hold-to-Trigger SOS Button with SVG Progress Ring */}
-            <div className="relative inline-flex items-center justify-center">
-              {!lowPowerDataSaverMode && (
-                <svg
-                  className="w-56 h-56 -rotate-90 pointer-events-none"
-                  viewBox="0 0 220 220"
-                  aria-hidden="true"
-                >
-                  <circle
-                    cx="110"
-                    cy="110"
-                    r={radius}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="10"
-                    className="text-slate-200 dark:text-slate-800"
-                  />
-                  <circle
-                    cx="110"
-                    cy="110"
-                    r={radius}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="10"
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    data-testid="sos-progress-ring"
-                    className="text-rose-600 dark:text-rose-500 transition-all duration-100"
-                  />
-                </svg>
-              )}
+            {/* Paper Utility 72px Horizontal Hold-to-Trigger Button with Linear Progress Fill */}
+            <div className="relative w-full max-w-lg mx-auto">
+              <span
+                data-testid="sos-progress-ring"
+                className="sr-only"
+                aria-hidden="true"
+                style={{ strokeDashoffset }}
+              >
+                {holdProgress}%
+              </span>
 
               <button
                 type="button"
@@ -1684,69 +2035,90 @@ export const HomePage: React.FC = () => {
                     cancelHoldEarly();
                   }
                 }}
-                className={`${
-                  lowPowerDataSaverMode ? 'relative' : 'absolute'
-                } w-44 h-44 min-h-[56px] min-w-[56px] rounded-full bg-rose-700 hover:bg-rose-800 active:bg-rose-900 text-white shadow-xl flex flex-col items-center justify-center gap-1 select-none touch-none ${
-                  lowPowerDataSaverMode
-                    ? ''
-                    : `transition-transform ${isHolding ? 'scale-95' : 'scale-100'}`
-                } focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose-500 focus-visible:ring-offset-4 dark:focus-visible:ring-offset-slate-950`}
+                className="relative w-full min-h-[72px] h-[72px] bg-crimson-800 text-surface rounded-2xl border border-crimson-900 select-none overflow-hidden flex flex-col items-center justify-center cursor-pointer active:bg-crimson-900 shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 transition-transform active:scale-[0.99]"
               >
-                <span className="text-4xl font-extrabold tracking-tight">
-                  {t('sos.buttonLabel')}
-                </span>
-                <span className="text-xs font-medium px-3 text-rose-100">
-                  {isHolding
-                    ? t('sos.holdingProgress', { percent: holdProgress })
-                    : '2s hold'}
-                </span>
+                <div
+                  className="absolute left-0 top-0 bottom-0 bg-crimson-900 transition-none pointer-events-none"
+                  style={{ width: `${holdProgress}%` }}
+                />
+                <div className="relative z-10 flex flex-col items-center justify-center text-center px-4">
+                  <span className="text-xl font-bold tracking-wide uppercase text-surface">
+                    {t('sos.buttonLabel')}
+                  </span>
+                  <span className="text-xs text-surface/90 font-mono tabular-nums">
+                    {isHolding
+                      ? t('sos.holdingProgress', { percent: holdProgress })
+                      : '2s hold'}
+                  </span>
+                </div>
               </button>
             </div>
 
-            {/* Calm Secondary Safety Tools: Fake Call & Loud Alarm (56px targets) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            {/* Quick Utility Row: 3 Quiet Utility Buttons (48px targets) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 max-w-lg mx-auto pt-2">
               <button
                 type="button"
                 data-testid="home-fake-call-btn"
                 onClick={handleFakeCallClick}
-                className="min-h-[56px] px-5 py-3 rounded-2xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100 inline-flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/50"
+                className="min-h-[48px] px-3 py-2.5 rounded-xl font-semibold text-sm bg-surface hover:bg-surface-container border border-line text-ink dark:bg-night-surface dark:border-night-line dark:text-night-text dark:hover:bg-night flex items-center justify-center gap-2 shadow-xs transition-colors"
               >
                 <Phone className="w-4 h-4 text-teal-700 dark:text-teal-400" />
-                {t('fakeCall.homeBtn')}
+                <span className="truncate">{t('fakeCall.homeBtn')}</span>
               </button>
               <button
                 type="button"
                 data-testid="home-loud-alarm-btn"
                 onClick={handleLoudAlarmClick}
-                className="min-h-[56px] px-5 py-3 rounded-2xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100 inline-flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/50"
+                className="min-h-[48px] px-3 py-2.5 rounded-xl font-semibold text-sm bg-surface hover:bg-surface-container border border-line text-ink dark:bg-night-surface dark:border-night-line dark:text-night-text dark:hover:bg-night flex items-center justify-center gap-2 shadow-xs transition-colors"
               >
-                <Bell className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                {t('loudAlarm.homeBtn')}
+                <Bell className="w-4 h-4 text-amber-700 dark:text-amber-400" />
+                <span className="truncate">{t('loudAlarm.homeBtn')}</span>
               </button>
+              <Link
+                to="/journeys"
+                className="min-h-[48px] px-3 py-2.5 rounded-xl font-semibold text-sm bg-surface hover:bg-surface-container border border-line text-ink dark:bg-night-surface dark:border-night-line dark:text-night-text dark:hover:bg-night flex items-center justify-center gap-2 shadow-xs transition-colors"
+              >
+                <MapPin className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                <span className="truncate">{t('journeys.navLink')}</span>
+              </Link>
             </div>
 
-            {/* Direct Helpline Call Links (56px targets) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            {/* Direct Helpline Call Links (48px targets) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-lg mx-auto pt-2">
               <a
                 href="tel:112"
-                className="min-h-[56px] px-5 py-3 rounded-2xl font-semibold text-sm bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 inline-flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/50"
+                className="min-h-[48px] px-5 py-2.5 rounded-xl font-semibold text-sm bg-ink text-surface hover:bg-slate-800 border border-ink dark:bg-night-surface dark:border-night-line dark:text-night-text inline-flex items-center justify-center gap-2 shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 transition-colors"
               >
                 <PhoneCall className="w-4 h-4" />
                 {t('sos.secondary.call112')}
               </a>
               <a
                 href="tel:181"
-                className="min-h-[56px] px-5 py-3 rounded-2xl font-semibold text-sm border-2 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 inline-flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/50"
+                className="min-h-[48px] px-5 py-2.5 rounded-xl font-semibold text-sm bg-surface border border-line text-ink hover:bg-surface-container dark:bg-night-surface dark:border-night-line dark:text-night-text inline-flex items-center justify-center gap-2 shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 transition-colors"
               >
                 <PhoneCall className="w-4 h-4" />
                 {t('sos.secondary.call181')}
               </a>
             </div>
 
+            {/* Guest Contacts Management: Only when not signed in */}
+            {!user && (
+              <div className="max-w-lg mx-auto pt-2">
+                <GuestContactsCard
+                  contacts={guestContacts}
+                  onContactsUpdated={async () => {
+                    const guest = await getGuestEmergencyContacts();
+                    setGuestContacts(guest);
+                    setNotifiableCount(guest.length);
+                  }}
+                />
+              </div>
+            )}
+
             {/* Small Calm Secondary Links Below (Circle, Consents/Resources, Guide) */}
             <nav
               aria-label="Secondary safety links"
-              className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-center gap-4 text-sm font-medium text-slate-600 dark:text-slate-400"
+              className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-center gap-4 text-sm font-medium text-slate-600 dark:text-slate-300"
             >
               <Link
                 to="/journeys"
@@ -1789,6 +2161,15 @@ export const HomePage: React.FC = () => {
               >
                 {t('sos.secondary.guideLink')}
               </Link>
+              {!user && (
+                <Link
+                  to="/login"
+                  data-testid="home-signin-link"
+                  className="min-h-[44px] px-3 inline-flex items-center gap-1.5 font-bold text-teal-700 dark:text-teal-400 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded-lg"
+                >
+                  {t('accountRequired.signInCta')}
+                </Link>
+              )}
             </nav>
 
             {/* Small dismissible weekly Safety Pulse card (never covering SOS, never shown during an active/queued alert or in disguise mode) */}

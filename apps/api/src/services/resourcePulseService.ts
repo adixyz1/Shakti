@@ -182,21 +182,27 @@ export interface PulseStatusDto {
 
 export async function getPulseStatusForUser(
   dbInstance: AppDatabase | undefined,
-  userId: string,
-  nowMs: number = Date.now()
+  userId: string | null | undefined,
+  nowMs: number = Date.now(),
+  guestKey?: string
 ): Promise<PulseStatusDto> {
   const db = dbInstance || getDb();
+  let dbLastMs = 0;
 
-  // Check both the non-anonymous DB rows for this user AND the in-memory weekly cadence tracker
-  const [latestDbRow] = await db
-    .select()
-    .from(safetyPulses)
-    .where(eq(safetyPulses.userId, userId))
-    .orderBy(desc(safetyPulses.createdAt))
-    .limit(1);
+  if (userId) {
+    const [latestDbRow] = await db
+      .select()
+      .from(safetyPulses)
+      .where(eq(safetyPulses.userId, userId))
+      .orderBy(desc(safetyPulses.createdAt))
+      .limit(1);
+    if (latestDbRow) {
+      dbLastMs = new Date(latestDbRow.createdAt).getTime();
+    }
+  }
 
-  const dbLastMs = latestDbRow ? new Date(latestDbRow.createdAt).getTime() : 0;
-  const memLastMs = weeklyPulsePromptTracker.get(userId) || 0;
+  const trackerKey = userId || guestKey || 'guest';
+  const memLastMs = weeklyPulsePromptTracker.get(trackerKey) || 0;
   const lastMs = Math.max(dbLastMs, memLastMs);
 
   if (lastMs > 0 && nowMs - lastMs < PULSE_WEEK_WINDOW_MS) {
@@ -233,14 +239,15 @@ export interface SubmittedPulseDto {
  * Two questions only:
  * 1) "How safe did you feel traveling this week? (1-5)"
  * 2) "Did you avoid going somewhere because of safety? (Yes/No)"
- * Enforces at most once a week per user.
+ * Enforces at most once a week per user or guest.
  * For anonymous pulses: stores NO user_id (`user_id = NULL`) and ONLY the date (`YYYY-MM-DD`).
  */
 export async function submitSafetyPulse(
   dbInstance: AppDatabase | undefined,
-  userId: string,
+  userId: string | null | undefined,
   input: SubmitPulseInput,
-  nowMs: number = Date.now()
+  nowMs: number = Date.now(),
+  guestKey?: string
 ): Promise<SubmittedPulseDto> {
   const db = dbInstance || getDb();
 
@@ -253,8 +260,8 @@ export async function submitSafetyPulse(
     throw new HttpError(422, 'avoided_going_somewhere must be a boolean.');
   }
 
-  // Enforce weekly cadence (at most once per 7 days per user)
-  const status = await getPulseStatusForUser(db, userId, nowMs);
+  // Enforce weekly cadence (at most once per 7 days per user/guest)
+  const status = await getPulseStatusForUser(db, userId, nowMs, guestKey);
   if (!status.should_prompt) {
     throw new HttpError(
       429,
@@ -262,7 +269,7 @@ export async function submitSafetyPulse(
     );
   }
 
-  const isAnonymous = Boolean(input.anonymous);
+  const isAnonymous = !userId || Boolean(input.anonymous);
   const fullIso = new Date(nowMs).toISOString();
   // Critical rule: For anonymous pulses store NO user_id and ONLY the date (YYYY-MM-DD)
   const createdAtValue = isAnonymous ? fullIso.slice(0, 10) : fullIso;
@@ -280,7 +287,8 @@ export async function submitSafetyPulse(
   await db.insert(safetyPulses).values(row);
 
   // Record timestamp in weekly cadence tracker so prompt stays suppressed for 7 days
-  weeklyPulsePromptTracker.set(userId, nowMs);
+  const trackerKey = userId || guestKey || 'guest';
+  weeklyPulsePromptTracker.set(trackerKey, nowMs);
 
   logger.info('[SafetyPulse] Recorded weekly safety pulse response');
 

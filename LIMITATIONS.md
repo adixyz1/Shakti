@@ -77,3 +77,21 @@ This document provides a realistic, unembellished assessment of the technical bo
 - **Background Timer Pauses**: In mobile web browsers, JavaScript timers (`setTimeout`/`setInterval`) are throttled or suspended when the device screen locks or the browser tab is sent to the background. Therefore, the fake incoming call countdown timer pauses if the phone locks or the app goes to the background, and resumes when brought back to the foreground.
 - **Device Volume & Silent Switch Control**: Web Audio API synthesis output is governed strictly by the physical device's master media volume and operating system audio profiles. The web application cannot override hardware volume buttons, hardware mute switches, or operating system "Do Not Disturb" / silent profiles. Users must ensure device volume is turned up for the loud alarm to be effective.
 
+---
+
+## 12. Guest Mode Boundaries
+
+- **Device-Only Data Storage**: Guest emergency contacts, trigger preferences, and device cancel PIN hashes are stored solely within the local browser IndexedDB (`saathi_offline_db`) and localStorage. This data is never synchronized to the server and cannot be recovered if the browser storage or site cookies are erased, or if private / incognito browsing is used.
+- **Local Cancel PIN Storage**: The local cancel PIN is a salted hash on the device and could be guessed by someone with developer-tools access.
+- **SMS Fallback Without Silent Escalation**: Guest SOS operates strictly on the device with zero server API interaction. When the cancel window elapses, the application builds emergency SMS messages using the phone's native messaging application (`sms:` protocol). Because it is not connected to a server account, guest SOS cannot silently dispatch notifications or trigger server-side automated escalations.
+- **Duress Protection Requires a Server Account**: The silent duress safety PIN is unavailable in Guest Mode. Silent duress signaling relies on server-authoritative state transitions, real-time responder dispatch, and background tracking continuity that cannot function without a verified account.
+
+---
+
+## 13. Safety Tools Guide & Outbound Links
+- **No Endorsement or Safety Guarantee**: Tools cataloged in the Safety Tools guide (e.g., personal alarm keychains, whistles, torch keyrings, portable door alarms, pepper spray) are provided strictly as educational and informational references. SHAKTI does not manufacture, sell, warrant, or endorse any specific tool or supplier. Possessing or carrying a safety device does not guarantee personal safety.
+- **No Click Tracking or Purchase Records**: SHAKTI does not track outbound clicks, referral pathways, or browsing activities, and stores zero purchase, payment, cart, or checkout data.
+- **Outbound Links Leave the Application**: Outbound links redirect to third-party web destinations that operate independently under their own privacy policies and terms of service.
+- **Jurisdictional & Regulatory Differences**: Laws and carriage rules for personal safety devices (such as pepper spray or alarms) vary across jurisdictions, transit authorities, aviation rules, and institutional premises, and may evolve over time. Users must verify local regulations independently.
+
+

@@ -86,7 +86,7 @@ export async function requestOtpForPhone(
 
   const shouldReturnHint =
     isDemo &&
-    isSeededDemoPhone &&
+    (isSeededDemoPhone || isDemoModeEnabled()) &&
     (!isAdminPhone || allowAdminHint);
 
   const response: {

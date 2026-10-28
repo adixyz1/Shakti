@@ -533,4 +533,73 @@ export const postIncidentRatings = sqliteTable(
 export type PostIncidentRatingRow = typeof postIncidentRatings.$inferSelect;
 export type NewPostIncidentRatingRow = typeof postIncidentRatings.$inferInsert;
 
+export const SAFETY_TOOL_CATEGORIES = [
+  'personal_alarm_keychain',
+  'whistle',
+  'torch_keyring',
+  'portable_door_alarm',
+  'pepper_spray',
+] as const;
+export type SafetyToolCategory = (typeof SAFETY_TOOL_CATEGORIES)[number];
+
+export const safetyTools = sqliteTable(
+  'safety_tools',
+  {
+    id: text('id').primaryKey(),
+    category: text('category').notNull(),
+    title: text('title').notNull(),
+    description: text('description').notNull(),
+    safeUseNotes: text('safe_use_notes').notNull(),
+    legalNote: text('legal_note').notNull(),
+    linkUrl: text('link_url'),
+    linkLabel: text('link_label').notNull(),
+    lastChecked: text('last_checked').notNull(),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    isAffiliate: integer('is_affiliate', { mode: 'boolean' }).notNull().default(false),
+  },
+  (table) => [
+    index('idx_safety_tools_category').on(table.category),
+    index('idx_safety_tools_active').on(table.active),
+  ]
+);
+
+export type SafetyToolRow = typeof safetyTools.$inferSelect;
+export type NewSafetyToolRow = typeof safetyTools.$inferInsert;
+
+export const safetyToolCategories = sqliteTable(
+  'safety_tool_categories',
+  {
+    id: text('id').primaryKey(),
+    slug: text('slug').notNull().unique(),
+    title: text('title').notNull(),
+    description: text('description').notNull(),
+    safeUseNotes: text('safe_use_notes').notNull(),
+    legalNote: text('legal_note').notNull(),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+  },
+  (table) => [index('idx_safety_tool_cat_slug').on(table.slug)]
+);
+
+export const safetyToolLinks = sqliteTable(
+  'safety_tool_links',
+  {
+    id: text('id').primaryKey(),
+    categoryId: text('category_id').notNull(),
+    sellerName: text('seller_name').notNull(),
+    linkUrl: text('link_url').notNull(),
+    isAffiliate: integer('is_affiliate', { mode: 'boolean' }).notNull().default(false),
+    lastChecked: text('last_checked').notNull(),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+  },
+  (table) => [
+    index('idx_safety_tool_links_cat').on(table.categoryId),
+    index('idx_safety_tool_links_active').on(table.active),
+  ]
+);
+
+export type SafetyToolCategoryRow = typeof safetyToolCategories.$inferSelect;
+export type NewSafetyToolCategoryRow = typeof safetyToolCategories.$inferInsert;
+export type SafetyToolLinkRow = typeof safetyToolLinks.$inferSelect;
+export type NewSafetyToolLinkRow = typeof safetyToolLinks.$inferInsert;
+
 

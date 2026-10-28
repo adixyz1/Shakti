@@ -737,13 +737,15 @@ describe('SAATHI Phase 5 Web Tests (Offline Queue, Idempotency, SMS Fallback, Co
         expect(screen.queryByTestId('honest-sent-at-banner')).toBeNull();
       });
 
-      const groupSmsLink = screen.getByTestId(
-        'sms-fallback-group-link'
-      ) as HTMLAnchorElement;
-      expect(groupSmsLink.getAttribute('href')).toContain('sms:');
-      expect(groupSmsLink.getAttribute('href')).toContain(
-        encodeURIComponent('https://maps.google.com/?q=28.61390,77.20900')
-      );
+      await waitFor(() => {
+        const groupSmsLink = screen.getByTestId(
+          'sms-fallback-group-link'
+        ) as HTMLAnchorElement;
+        expect(groupSmsLink.getAttribute('href')).toContain('sms:');
+        expect(groupSmsLink.getAttribute('href')).toContain(
+          encodeURIComponent('https://maps.google.com/?q=28.61390,77.20900')
+        );
+      });
       expect(screen.getByTestId('offline-call-112-btn')).toBeTruthy();
       expect(screen.getByTestId('offline-call-181-btn')).toBeTruthy();
 

@@ -137,6 +137,10 @@ shakti/
 │           ├── store/           # Zustand state management stores
 │           └── tests/           # React Testing Library unit & component tests
 ├── docs/                        # Architecture, API specifications, and privacy docs
+│   ├── PRD.md                   # Product Requirements Document (Full features & behavior)
+│   ├── TRD.md                   # Technical Requirements Document (Stack, APIs & choices)
+│   ├── UI_UX_DESIGN_BRIEF.md    # UI/UX Design Brief (Tokens, ergonomics & screen layout)
+│   ├── BACKEND_SCHEMA_ARCHITECTURE.md # 19-table database schema & system architecture
 │   ├── API.md                   # Full endpoint specification by access class
 │   ├── ARCHITECTURE.md          # Mermaid architecture and incident state machine
 │   ├── DEMO_SCRIPT.md           # Presentation and demo script

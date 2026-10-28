@@ -32,7 +32,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `(test -f dist/index.html || npm run build) && NODE_ENV=test SERVE_STATIC=true DEMO_MODE=true SAATHI_PORT=${testPort} DATABASE_URL=file:${tempDbPath} ESCALATION_STEP1_DELAY_SECONDS=1 ESCALATION_STEP2_DELAY_SECONDS=2 AUTH_RATE_LIMIT_PER_MINUTE=500 PIN_SETTINGS_RATE_LIMIT_PER_MINUTE=500 CORS_ORIGINS=http://127.0.0.1:${testPort},http://localhost:${testPort} tsx apps/api/server.ts`,
+    command: `(test -f dist/index.html || npm run build) && NODE_ENV=test SERVE_STATIC=true DEMO_MODE=true JWT_SECRET=super_secret_jwt_key_for_testing_32_chars! HMAC_SECRET=super_secret_jwt_key_for_testing_32_chars! PORT=${testPort} SAATHI_PORT=${testPort} DATABASE_URL=file:${tempDbPath} ESCALATION_STEP1_DELAY_SECONDS=1 ESCALATION_STEP2_DELAY_SECONDS=2 AUTH_RATE_LIMIT_PER_MINUTE=500 PIN_SETTINGS_RATE_LIMIT_PER_MINUTE=500 CORS_ORIGINS=http://127.0.0.1:${testPort},http://localhost:${testPort} tsx apps/api/server.ts`,
     url: `http://127.0.0.1:${testPort}/api/health`,
     reuseExistingServer: false,
     timeout: 60_000,

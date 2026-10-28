@@ -170,17 +170,17 @@ export const DisguiseCalculator: React.FC<DisguiseCalculatorProps> = ({
       data-testid="disguise-calculator"
       className="min-h-screen bg-slate-950 text-slate-50 flex flex-col items-center justify-center p-4"
     >
-      <div className="w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 p-5 shadow-2xl space-y-4">
-        <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+      <div className="w-full max-w-sm rounded-2xl bg-slate-900 border border-line dark:border-night-line p-5 space-y-4">
+        <div className="flex items-center justify-between text-xs text-slate-300 px-1 font-mono uppercase tracking-wider">
           <span>{t('disguise.calculatorTitle')}</span>
-          <span className="font-mono">STD</span>
+          <span>STD</span>
         </div>
 
         {/* Display Screen */}
-        <div className="rounded-2xl bg-slate-950 border border-slate-800 p-4 text-right space-y-1 min-h-[96px] flex flex-col justify-end">
+        <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 text-right space-y-1 min-h-[96px] flex flex-col justify-end">
           <div
             data-testid="calc-expression"
-            className="text-xs font-mono text-slate-400 min-h-[18px] truncate"
+            className="text-xs font-mono text-slate-300 min-h-[18px] truncate"
           >
             {expressionPreview}
           </div>
@@ -193,14 +193,14 @@ export const DisguiseCalculator: React.FC<DisguiseCalculatorProps> = ({
           </div>
         </div>
 
-        {/* Keypad Grid (all buttons >= 56px) */}
-        <div className="grid grid-cols-4 gap-2.5">
+        {/* Keypad Grid (all buttons >= 56px with rounded-xl utility discipline) */}
+        <div className="grid grid-cols-4 gap-2">
           <button
             type="button"
             data-testid="calc-key-C"
             aria-label={t('disguise.clearLabel')}
             onClick={handleClear}
-            className="min-h-[56px] rounded-2xl bg-slate-800 hover:bg-slate-700 text-rose-400 font-bold text-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+            className="min-h-[56px] rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-400 font-bold text-lg border border-slate-700/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
           >
             C
           </button>
@@ -209,7 +209,7 @@ export const DisguiseCalculator: React.FC<DisguiseCalculatorProps> = ({
             data-testid="calc-key-backspace"
             aria-label={t('disguise.backspaceLabel')}
             onClick={handleBackspace}
-            className="min-h-[56px] rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-lg inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+            className="min-h-[56px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-lg inline-flex items-center justify-center border border-slate-700/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
           >
             <Delete className="w-5 h-5" />
           </button>
@@ -218,7 +218,7 @@ export const DisguiseCalculator: React.FC<DisguiseCalculatorProps> = ({
             data-testid="calc-key-%"
             aria-label="Percent"
             onClick={handlePercent}
-            className="min-h-[56px] rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+            className="min-h-[56px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-lg border border-slate-700/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
           >
             %
           </button>
@@ -227,7 +227,7 @@ export const DisguiseCalculator: React.FC<DisguiseCalculatorProps> = ({
             data-testid="calc-key-÷"
             aria-label="Divide"
             onClick={() => handleOperator('÷')}
-            className="min-h-[56px] rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+            className="min-h-[56px] rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xl border border-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
           >
             ÷
           </button>
@@ -239,7 +239,7 @@ export const DisguiseCalculator: React.FC<DisguiseCalculatorProps> = ({
               data-testid={`calc-key-${d}`}
               aria-label={`Calculator digit ${d}`}
               onClick={() => handleDigit(d)}
-              className="min-h-[56px] rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-white font-semibold text-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+              className="min-h-[56px] rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white font-semibold text-xl border border-slate-700/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
             >
               {d}
             </button>
@@ -249,7 +249,7 @@ export const DisguiseCalculator: React.FC<DisguiseCalculatorProps> = ({
             data-testid="calc-key-×"
             aria-label="Multiply"
             onClick={() => handleOperator('×')}
-            className="min-h-[56px] rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+            className="min-h-[56px] rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xl border border-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
           >
             ×
           </button>
@@ -261,7 +261,7 @@ export const DisguiseCalculator: React.FC<DisguiseCalculatorProps> = ({
               data-testid={`calc-key-${d}`}
               aria-label={`Calculator digit ${d}`}
               onClick={() => handleDigit(d)}
-              className="min-h-[56px] rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-white font-semibold text-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+              className="min-h-[56px] rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white font-semibold text-xl border border-slate-700/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
             >
               {d}
             </button>
@@ -271,7 +271,7 @@ export const DisguiseCalculator: React.FC<DisguiseCalculatorProps> = ({
             data-testid="calc-key--"
             aria-label="Subtract"
             onClick={() => handleOperator('-')}
-            className="min-h-[56px] rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+            className="min-h-[56px] rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xl border border-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
           >
             -
           </button>
@@ -283,7 +283,7 @@ export const DisguiseCalculator: React.FC<DisguiseCalculatorProps> = ({
               data-testid={`calc-key-${d}`}
               aria-label={`Calculator digit ${d}`}
               onClick={() => handleDigit(d)}
-              className="min-h-[56px] rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-white font-semibold text-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+              className="min-h-[56px] rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white font-semibold text-xl border border-slate-700/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
             >
               {d}
             </button>
@@ -293,7 +293,7 @@ export const DisguiseCalculator: React.FC<DisguiseCalculatorProps> = ({
             data-testid="calc-key-+"
             aria-label="Add"
             onClick={() => handleOperator('+')}
-            className="min-h-[56px] rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+            className="min-h-[56px] rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xl border border-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
           >
             +
           </button>
@@ -303,7 +303,7 @@ export const DisguiseCalculator: React.FC<DisguiseCalculatorProps> = ({
             data-testid="calc-key-0"
             aria-label="Calculator digit 0"
             onClick={() => handleDigit('0')}
-            className="col-span-2 min-h-[56px] rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-white font-semibold text-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+            className="col-span-2 min-h-[56px] rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white font-semibold text-xl border border-slate-700/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
           >
             0
           </button>
@@ -312,7 +312,7 @@ export const DisguiseCalculator: React.FC<DisguiseCalculatorProps> = ({
             data-testid="calc-key-."
             aria-label="Decimal point"
             onClick={handleDecimal}
-            className="min-h-[56px] rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold text-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+            className="min-h-[56px] rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold text-xl border border-slate-700/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
           >
             .
           </button>
@@ -321,7 +321,7 @@ export const DisguiseCalculator: React.FC<DisguiseCalculatorProps> = ({
             data-testid="calc-key-="
             aria-label="Equals"
             onClick={handleEquals}
-            className="min-h-[56px] rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
+            className="min-h-[56px] rounded-xl bg-teal-800 hover:bg-teal-700 text-white font-bold text-xl border border-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
           >
             =
           </button>

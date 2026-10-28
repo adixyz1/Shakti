@@ -26,6 +26,7 @@ import { metricsRouter } from './src/routes/metrics';
 import { reportsRouter } from './src/routes/reports';
 import { resourcesPulseRouter } from './src/routes/resourcesPulse';
 import { responderRouter } from './src/routes/responder';
+import { safetyToolsRouter } from './src/routes/safetyTools';
 import { startRetentionPurgeSchedule } from './src/services/retentionService';
 import {
   recoverActiveJourneysOnStartup,
@@ -60,6 +61,7 @@ export function createApp(): Express {
   app.use('/api', reportsRouter);
   app.use('/api', resourcesPulseRouter);
   app.use('/api', responderRouter);
+  app.use('/api', safetyToolsRouter);
   app.use('/', apiRouter);
   app.use('/', consentsRouter);
   app.use('/', contactsRouter);
@@ -70,6 +72,7 @@ export function createApp(): Express {
   app.use('/', reportsRouter);
   app.use('/', resourcesPulseRouter);
   app.use('/', responderRouter);
+  app.use('/', safetyToolsRouter);
 
   return app;
 }

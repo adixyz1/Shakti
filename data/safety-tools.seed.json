@@ -1,0 +1,57 @@
+{
+  "categories": [
+    {
+      "id": "cat_alarm",
+      "slug": "personal_alarm_keychain",
+      "title": "Personal Alarm Keychain",
+      "description": "A compact device that emits an intense 120-130 dB ear-piercing siren upon pulling a pin or pressing a button.",
+      "safe_use_notes": "Test batteries monthly in an enclosed muffling cloth to prevent auditory discomfort. Keep the pull pin unobstructed and practice activation with one hand.",
+      "legal_note": "Lawful in all public spaces in India and generally unrestricted worldwide. Does not constitute a weapon.",
+      "links": []
+    },
+    {
+      "id": "cat_whistle",
+      "slug": "whistle",
+      "title": "Safety Whistle",
+      "description": "Pea-less, high-decibel acoustic whistle engineered for long-range audio signaling in urban and remote settings.",
+      "safe_use_notes": "Wear on an accessible lanyard or exterior zipper loop. Blow in short bursts of three distinct blasts (the universal international distress signal).",
+      "legal_note": "100% legal to carry, store, and transport on flights and public transit everywhere.",
+      "links": []
+    },
+    {
+      "id": "cat_torch",
+      "slug": "torch_keyring",
+      "title": "Torch Keyring",
+      "description": "Ultra-bright compact flashlight with sustained lumen beam and optional high-frequency strobe function.",
+      "safe_use_notes": "Recharge via USB-C or swap coin cells regularly. The strobe mode can briefly disorient an approaching threat in dark stairwells or poorly lit lanes.",
+      "legal_note": "Unrestricted everyday illumination tool with zero carriage constraints.",
+      "links": []
+    },
+    {
+      "id": "cat_door_alarm",
+      "slug": "portable_door_alarm",
+      "title": "Portable Door Alarm",
+      "description": "Travel security wedge or pressure sensor with integrated loud chime to detect unauthorized door opening in hotel rooms and rentals.",
+      "safe_use_notes": "Position firmly under the door gap before sleeping. Check rubber footing grip on slick tile flooring.",
+      "legal_note": "Fully legal travel accessory. Approved for carry-on luggage and checked baggage.",
+      "links": []
+    },
+    {
+      "id": "cat_pepper_spray",
+      "slug": "pepper_spray",
+      "title": "Pepper Spray",
+      "description": "Oleoresin capsicum (OC) canister delivering a targeted spray or stream to cause temporary lacrimation and incapacitation of an attacker.",
+      "safe_use_notes": "Check canister expiration date annually. Hold canister with thumb over trigger for secure grip. Always be mindful of wind direction before spraying.",
+      "legal_note": "Rules about carrying pepper spray can differ by place and change over time, so check local regulations before you buy or carry. In India, carriage for lawful self-defense is permitted, but prohibited on flights and inside secured government or transit facilities. Ask a qualified person for legal advice.",
+      "links": [
+        {
+          "id": "link_example_delete_me",
+          "seller_name": "Example Trusted Seller (example, delete me)",
+          "link_url": "https://example.com/trusted-seller",
+          "is_affiliate": false,
+          "last_checked": "2026-10-25"
+        }
+      ]
+    }
+  ]
+}

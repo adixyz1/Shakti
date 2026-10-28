@@ -83,17 +83,17 @@ export const ClosedAlertSupportCard: React.FC<ClosedAlertSupportCardProps> = ({
   return (
     <Card
       data-testid="closed-alert-support-card"
-      className="p-4 sm:p-5 border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 space-y-3 text-left"
+      className="p-4 sm:p-5 border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl space-y-3 text-left shadow-sm"
     >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <HeartHandshake
-            className="w-5 h-5 text-teal-700 dark:text-teal-400 shrink-0"
+            className="w-5 h-5 text-teal-800 dark:text-teal-400 shrink-0"
             aria-hidden="true"
           />
           <span
             data-testid="support-card-prompt"
-            className="text-sm font-semibold text-slate-800 dark:text-slate-200"
+            className="text-sm font-semibold text-slate-900 dark:text-slate-100"
           >
             {t('supportOptions.prompt')}{' '}
           </span>
@@ -102,7 +102,7 @@ export const ClosedAlertSupportCard: React.FC<ClosedAlertSupportCardProps> = ({
         <Link
           to="/resources"
           data-testid="support-options-link"
-          className="min-h-[56px] px-5 py-3 rounded-xl font-bold text-sm bg-teal-800 hover:bg-teal-900 text-white dark:bg-teal-600 dark:hover:bg-teal-500 inline-flex items-center justify-center gap-2 shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/50"
+          className="min-h-[56px] px-5 py-3 rounded-xl font-bold text-sm bg-teal-800 hover:bg-teal-900 text-white dark:bg-teal-700 dark:hover:bg-teal-600 inline-flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700"
         >
           {t('supportOptions.cta')}
         </Link>
@@ -113,14 +113,14 @@ export const ClosedAlertSupportCard: React.FC<ClosedAlertSupportCardProps> = ({
           data-testid="offline-support-fallback"
           className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2.5"
         >
-          <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
             {t('supportOptions.offlineNotice')}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <a
               href={`tel:${LOCAL_SUPPORT_HELPLINES.womenHelpline}`}
               data-testid="support-call-181"
-              className="min-h-[56px] px-4 py-3 rounded-xl font-bold text-sm bg-white dark:bg-slate-800 border-2 border-teal-700 text-teal-800 dark:text-teal-300 dark:border-teal-500 hover:bg-teal-50 dark:hover:bg-slate-700 inline-flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/50"
+              className="min-h-[56px] px-4 py-3 rounded-xl font-bold text-sm bg-slate-50 dark:bg-slate-800 border border-teal-800 text-teal-800 dark:text-teal-300 dark:border-teal-500 hover:bg-slate-100 dark:hover:bg-slate-700 inline-flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700"
             >
               <PhoneCall className="w-4 h-4" aria-hidden="true" />
               {t('supportOptions.call181')}
@@ -128,7 +128,7 @@ export const ClosedAlertSupportCard: React.FC<ClosedAlertSupportCardProps> = ({
             <a
               href={`tel:${LOCAL_SUPPORT_HELPLINES.emergency}`}
               data-testid="support-call-112"
-              className="min-h-[56px] px-4 py-3 rounded-xl font-bold text-sm bg-rose-700 text-white hover:bg-rose-800 inline-flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose-500/50"
+              className="min-h-[56px] px-4 py-3 rounded-xl font-bold text-sm bg-rose-700 text-white hover:bg-rose-800 inline-flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50"
             >
               <PhoneCall className="w-4 h-4" aria-hidden="true" />
               {t('supportOptions.call112')}

@@ -30,17 +30,22 @@ export interface CachedEmergencyContact {
   name: string;
   phone_e164: string;
   priority_order: number;
+  is_guest_contact?: boolean;
 }
 
 export class SaathiOfflineDatabase extends Dexie {
   queuedAlerts!: Table<QueuedSosAlert, string>;
   cachedContacts!: Table<CachedEmergencyContact, string>;
+  guestContacts!: Table<CachedEmergencyContact, string>;
 
   constructor() {
     super('saathi_offline_db');
     this.version(1).stores({
       queuedAlerts: 'client_request_id, client_created_at, status, next_retry_at',
       cachedContacts: 'id, priority_order',
+    });
+    this.version(2).stores({
+      guestContacts: 'id, priority_order',
     });
   }
 }
@@ -50,6 +55,7 @@ export const offlineDb = new SaathiOfflineDatabase();
 // Fallback in-memory stores if IndexedDB is unavailable in a bare JSDOM test without fake-indexeddb
 const memoryQueuedAlerts = new Map<string, QueuedSosAlert>();
 const memoryCachedContacts = new Map<string, CachedEmergencyContact>();
+const memoryGuestContacts = new Map<string, CachedEmergencyContact>();
 
 type QueueChangeListener = () => void;
 const queueChangeListeners = new Set<QueueChangeListener>();
@@ -435,6 +441,147 @@ export async function clearOfflineEmergencyContactsCache(): Promise<void> {
     await offlineDb.cachedContacts.clear();
   } catch {
     // ignore
+  }
+}
+
+export const MAX_GUEST_CONTACTS = 5;
+
+export async function getGuestEmergencyContacts(): Promise<
+  CachedEmergencyContact[]
+> {
+  if (memoryGuestContacts.size > 0) {
+    return Array.from(memoryGuestContacts.values()).sort(
+      (a, b) => a.priority_order - b.priority_order
+    );
+  }
+  try {
+    const rows = await offlineDb.guestContacts
+      .orderBy('priority_order')
+      .toArray();
+    for (const r of rows) {
+      memoryGuestContacts.set(r.id, r);
+    }
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
+export async function addGuestEmergencyContact(
+  nameOrPayload: string | { name: string; phone_e164: string },
+  maybePhone?: string
+): Promise<CachedEmergencyContact> {
+  const current = await getGuestEmergencyContacts();
+  if (current.length >= MAX_GUEST_CONTACTS) {
+    throw new Error(`Maximum of ${MAX_GUEST_CONTACTS} contacts allowed on this device.`);
+  }
+
+  const name = typeof nameOrPayload === 'string' ? nameOrPayload : nameOrPayload.name;
+  const phone_e164 = typeof nameOrPayload === 'string' ? (maybePhone || '') : nameOrPayload.phone_e164;
+
+  const id = `guest_contact_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const cleanPhone = phone_e164.trim();
+  const cleanName = name.trim();
+  const contact: CachedEmergencyContact = {
+    id,
+    name: cleanName,
+    phone_e164: cleanPhone,
+    priority_order: current.length + 1,
+    is_guest_contact: true,
+  };
+
+  memoryGuestContacts.set(id, contact);
+  try {
+    await offlineDb.guestContacts.put(contact);
+  } catch {
+    // fallback to memory
+  }
+
+  return contact;
+}
+
+export async function updateGuestEmergencyContact(
+  id: string,
+  nameOrPayload: string | { name: string; phone_e164: string },
+  maybePhone?: string
+): Promise<void> {
+  const current = await getGuestEmergencyContacts();
+  const existing = current.find((c) => c.id === id);
+  if (!existing) {
+    throw new Error('Contact not found on this device.');
+  }
+
+  const name = typeof nameOrPayload === 'string' ? nameOrPayload : nameOrPayload.name;
+  const phone_e164 = typeof nameOrPayload === 'string' ? (maybePhone || '') : nameOrPayload.phone_e164;
+
+  const updated: CachedEmergencyContact = {
+    ...existing,
+    name: name.trim(),
+    phone_e164: phone_e164.trim(),
+    is_guest_contact: true,
+  };
+
+  memoryGuestContacts.set(id, updated);
+  try {
+    await offlineDb.guestContacts.put(updated);
+  } catch {
+    // fallback to memory
+  }
+}
+
+export async function removeGuestEmergencyContact(id: string): Promise<void> {
+  memoryGuestContacts.delete(id);
+  try {
+    await offlineDb.guestContacts.delete(id);
+  } catch {
+    // fallback to memory
+  }
+
+  // Re-index remaining contacts priority order
+  const remaining = await getGuestEmergencyContacts();
+  const reordered = remaining.map((c, idx) => ({
+    ...c,
+    priority_order: idx + 1,
+  }));
+
+  memoryGuestContacts.clear();
+  for (const c of reordered) {
+    memoryGuestContacts.set(c.id, c);
+  }
+
+  try {
+    await offlineDb.guestContacts.clear();
+    if (reordered.length > 0) {
+      await offlineDb.guestContacts.bulkPut(reordered);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export async function clearGuestEmergencyContacts(): Promise<void> {
+  memoryGuestContacts.clear();
+  try {
+    await offlineDb.guestContacts.clear();
+  } catch {
+    // ignore
+  }
+}
+
+export async function clearAllDeviceData(): Promise<void> {
+  await clearAllOfflineStateOnLogout();
+  await clearGuestEmergencyContacts();
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.clear();
+    } catch {
+      // ignore
+    }
+    try {
+      window.sessionStorage.clear();
+    } catch {
+      // ignore
+    }
   }
 }
 

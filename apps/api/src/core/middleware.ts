@@ -150,6 +150,7 @@ const pinSettingsRateBuckets = new Map<string, number[]>();
 const contactResponseRateBuckets = new Map<string, number[]>();
 const reportRateBuckets = new Map<string, number[]>();
 const reportDailyCapBuckets = new Map<string, number[]>();
+const safetyToolsRateBuckets = new Map<string, number[]>();
 
 export function resetRateLimiter(): void {
   rateBuckets.clear();
@@ -157,6 +158,7 @@ export function resetRateLimiter(): void {
   contactResponseRateBuckets.clear();
   reportRateBuckets.clear();
   reportDailyCapBuckets.clear();
+  safetyToolsRateBuckets.clear();
 }
 
 export function reportRateLimitMiddleware(
@@ -331,6 +333,36 @@ export async function requireAuth(
   }
 }
 
+export async function optionalAuth(
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    let token: string | undefined = req.cookies?.[ACCESS_COOKIE_NAME];
+    if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+      token = req.headers.authorization.slice(7).trim();
+    }
+
+    if (token) {
+      const payload = verifyToken(token, 'access');
+      const db = getDb();
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, payload.sub))
+        .limit(1);
+
+      if (user) {
+        req.user = user;
+      }
+    }
+  } catch {
+    // optional auth ignores invalid/expired tokens and proceeds without req.user
+  }
+  next();
+}
+
 export function requireRole(...allowedRoles: UserRole[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
@@ -344,3 +376,31 @@ export function requireRole(...allowedRoles: UserRole[]) {
     next();
   };
 }
+
+export function safetyToolsRateLimitMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
+  const forwardedIp =
+    typeof req.headers['x-forwarded-for'] === 'string'
+      ? req.headers['x-forwarded-for'].split(',')[0].trim()
+      : req.ip;
+  const clientKey = forwardedIp || 'unknown';
+  const now = Date.now();
+  const windowMs = 60_000;
+  const maxRequests = 60; // 60 req/min per IP
+  const timestamps = (safetyToolsRateBuckets.get(clientKey) || []).filter(
+    (t) => now - t < windowMs
+  );
+  if (timestamps.length >= maxRequests) {
+    res.status(429).json({
+      detail: 'Too many safety tool requests. Please wait a minute and try again.',
+    });
+    return;
+  }
+  timestamps.push(now);
+  safetyToolsRateBuckets.set(clientKey, timestamps);
+  next();
+}
+

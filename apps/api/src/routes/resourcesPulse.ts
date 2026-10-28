@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { getDb } from '../core/db';
-import { requireAuth, requireRole } from '../core/middleware';
+import { optionalAuth, requireAuth, requireRole } from '../core/middleware';
 import { HttpError } from '../services/authService';
 import {
   createResourceForAdmin,
@@ -153,14 +153,24 @@ resourcesPulseRouter.delete(
   }
 );
 
-// GET /api/pulse/status (so the prompt appears at most once a week per user)
+// GET /api/pulse/status (guest or authenticated; prompt appears at most once a week)
 resourcesPulseRouter.get(
   '/pulse/status',
-  requireAuth,
+  optionalAuth,
   async (req: Request, res: Response) => {
     try {
       const db = getDb();
-      const status = await getPulseStatusForUser(db, req.user!.id);
+      const forwardedIp =
+        typeof req.headers['x-forwarded-for'] === 'string'
+          ? req.headers['x-forwarded-for'].split(',')[0].trim()
+          : req.ip;
+      const guestKey = `anon_ip:${forwardedIp || 'unknown'}`;
+      const status = await getPulseStatusForUser(
+        db,
+        req.user?.id,
+        Date.now(),
+        guestKey
+      );
       res.status(200).json(status);
     } catch (err) {
       if (err instanceof HttpError) {
@@ -172,10 +182,10 @@ resourcesPulseRouter.get(
   }
 );
 
-// POST /api/pulse (optional anonymous; two questions only)
+// POST /api/pulse (guest or authenticated; optional anonymous; two questions only)
 resourcesPulseRouter.post(
   '/pulse',
-  requireAuth,
+  optionalAuth,
   async (req: Request, res: Response) => {
     const parsed = submitPulseSchema.safeParse(req.body || {});
     if (!parsed.success) {
@@ -187,7 +197,18 @@ resourcesPulseRouter.post(
 
     try {
       const db = getDb();
-      const pulse = await submitSafetyPulse(db, req.user!.id, parsed.data);
+      const forwardedIp =
+        typeof req.headers['x-forwarded-for'] === 'string'
+          ? req.headers['x-forwarded-for'].split(',')[0].trim()
+          : req.ip;
+      const guestKey = `anon_ip:${forwardedIp || 'unknown'}`;
+      const pulse = await submitSafetyPulse(
+        db,
+        req.user?.id,
+        parsed.data,
+        Date.now(),
+        guestKey
+      );
       res.status(201).json({ pulse });
     } catch (err) {
       if (err instanceof HttpError) {

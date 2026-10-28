@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Moon, Sun, Wifi, WifiOff } from 'lucide-react';
+import { Bell, Moon, Sun, Wifi, WifiOff } from 'lucide-react';
 import { LanguageToggle } from './LanguageToggle';
 import { BottomNav, Button, ToastContainer } from './ui';
+import { LoudAlarmModal } from './LoudAlarmModal';
 import { useAuthStore } from '../store/authStore';
 import { useTriggerSettingsStore } from '../store/triggerSettingsStore';
 import { authApi } from '../lib/api';
@@ -100,114 +101,151 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       </a>
       <DemoModeBanner />
       {/* Strict 3-Zone Top Bar Contract */}
-      <header className="sticky top-0 z-30 h-16 px-4 md:px-8 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md flex items-center justify-between">
-        {/* Zone 1: Single text element Brand wordmark (also default triple-tap zone) */}
-        <Link
-          to={user ? '/home' : '/'}
-          data-testid="triple-tap-zone-logo"
-          onClick={(e) => {
-            if (user && tripleTapEnabled && tripleTapZone === 'logo') {
-              recordTapInZone('logo');
-              if (getPracticeModeTarget() !== null) {
-                e.preventDefault();
-              }
-            }
-          }}
-          className="min-h-[56px] min-w-[56px] inline-flex items-center text-lg font-bold tracking-tight text-teal-800 dark:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded-lg px-2 select-none"
-        >
-          {t('app.name')}
-        </Link>
-
-        {/* Zone 2: Clean text navigation links */}
-        <nav
-          aria-label="Primary navigation"
-          className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-700 dark:text-slate-200"
-        >
+      <header className="sticky top-0 z-30 h-16 px-4 md:px-6 lg:px-8 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md flex items-center justify-between gap-4">
+        {/* Left Section: Brand Logo + Primary Nav */}
+        <div className="flex items-center gap-4 lg:gap-6 min-w-0 flex-1">
+          {/* Zone 1: Single text element Brand wordmark (also default triple-tap zone) */}
           <Link
             to={user ? '/home' : '/'}
-            className="min-h-[44px] inline-flex items-center hover:text-slate-900 dark:hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap"
+            data-testid="triple-tap-zone-logo"
+            onClick={(e) => {
+              if (user && tripleTapEnabled && tripleTapZone === 'logo') {
+                recordTapInZone('logo');
+                if (getPracticeModeTarget() !== null) {
+                  e.preventDefault();
+                }
+              }
+            }}
+            className="shrink-0 whitespace-nowrap min-h-[44px] inline-flex items-center text-lg sm:text-xl font-bold tracking-tight text-teal-800 dark:text-teal-400 hover:text-teal-900 dark:hover:text-teal-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded-lg px-2 select-none transition-colors"
           >
-            {t('nav.home')}
+            {t('app.name')}
           </Link>
-          {user && (
-            <>
-              <Link
-                to="/journeys"
-                data-testid="nav-journeys-link"
-                className="min-h-[44px] inline-flex items-center hover:text-slate-900 dark:hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap"
-              >
-                {t('journeys.navLink')}
-              </Link>
-              <Link
-                to="/reports"
-                data-testid="nav-reports-link"
-                className="min-h-[44px] inline-flex items-center hover:text-slate-900 dark:hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap"
-              >
-                {t('reports.navLink')}
-              </Link>
-              <Link
-                to="/resources"
-                data-testid="nav-resources-link"
-                className="min-h-[44px] inline-flex items-center hover:text-slate-900 dark:hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap"
-              >
-                {t('resources.navLink')}
-              </Link>
-              <Link
-                to="/circle"
-                className="min-h-[44px] inline-flex items-center hover:text-slate-900 dark:hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap"
-              >
-                {t('nav.circle')}
-              </Link>
-              <Link
-                to="/consents"
-                className="min-h-[44px] inline-flex items-center hover:text-slate-900 dark:hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap"
-              >
-                {t('nav.consents')}
-              </Link>
-              <Link
-                to="/settings"
-                className="min-h-[44px] inline-flex items-center hover:text-slate-900 dark:hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap"
-              >
-                {t('nav.settings')}
-              </Link>
-              {user.role === 'responder' && (
+
+          {/* Zone 2: Clean text navigation links */}
+          <nav
+            aria-label="Primary navigation"
+            className="hidden md:flex items-center gap-1 lg:gap-2 text-xs lg:text-sm font-medium text-slate-700 dark:text-slate-200 overflow-x-auto no-scrollbar py-1"
+          >
+            <Link
+              to={user ? '/home' : '/'}
+              className={`min-h-[38px] px-2.5 py-1.5 rounded-lg inline-flex items-center whitespace-nowrap transition-colors ${
+                location.pathname === '/home' || (!user && location.pathname === '/')
+                  ? 'text-teal-800 dark:text-teal-300 font-semibold bg-teal-50 dark:bg-teal-950/60'
+                  : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+              }`}
+            >
+              {t('nav.home')}
+            </Link>
+            {user && (
+              <>
                 <Link
-                  to="/responder"
-                  data-testid="nav-responder-link"
-                  className="min-h-[44px] inline-flex items-center font-bold text-teal-800 dark:text-teal-300 hover:underline underline-offset-4 transition-colors whitespace-nowrap"
+                  to="/journeys"
+                  data-testid="nav-journeys-link"
+                  className={`min-h-[38px] px-2.5 py-1.5 rounded-lg inline-flex items-center whitespace-nowrap transition-colors ${
+                    location.pathname === '/journeys'
+                      ? 'text-teal-800 dark:text-teal-300 font-semibold bg-teal-50 dark:bg-teal-950/60'
+                      : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                  }`}
                 >
-                  {t('responderDashboard.title')}
+                  {t('journeys.navLink')}
                 </Link>
-              )}
-              {user.role === 'admin' && (
                 <Link
-                  to="/admin"
-                  data-testid="nav-admin-link"
-                  className="min-h-[44px] inline-flex items-center font-bold text-teal-800 dark:text-teal-300 hover:underline underline-offset-4 transition-colors whitespace-nowrap"
+                  to="/reports"
+                  data-testid="nav-reports-link"
+                  className={`min-h-[38px] px-2.5 py-1.5 rounded-lg inline-flex items-center whitespace-nowrap transition-colors ${
+                    location.pathname === '/reports'
+                      ? 'text-teal-800 dark:text-teal-300 font-semibold bg-teal-50 dark:bg-teal-950/60'
+                      : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                  }`}
                 >
-                  {t('admin.navLink')}
+                  {t('reports.navLink')}
                 </Link>
-              )}
-            </>
-          )}
-        </nav>
+                <Link
+                  to="/resources"
+                  data-testid="nav-resources-link"
+                  className={`min-h-[38px] px-2.5 py-1.5 rounded-lg inline-flex items-center whitespace-nowrap transition-colors ${
+                    location.pathname === '/resources'
+                      ? 'text-teal-800 dark:text-teal-300 font-semibold bg-teal-50 dark:bg-teal-950/60'
+                      : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                  }`}
+                >
+                  {t('resources.navLink')}
+                </Link>
+                <Link
+                  to="/circle"
+                  className={`min-h-[38px] px-2.5 py-1.5 rounded-lg inline-flex items-center whitespace-nowrap transition-colors ${
+                    location.pathname === '/circle'
+                      ? 'text-teal-800 dark:text-teal-300 font-semibold bg-teal-50 dark:bg-teal-950/60'
+                      : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                  }`}
+                >
+                  {t('nav.circle')}
+                </Link>
+                <Link
+                  to="/consents"
+                  className={`min-h-[38px] px-2.5 py-1.5 rounded-lg inline-flex items-center whitespace-nowrap transition-colors ${
+                    location.pathname === '/consents'
+                      ? 'text-teal-800 dark:text-teal-300 font-semibold bg-teal-50 dark:bg-teal-950/60'
+                      : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                  }`}
+                >
+                  {t('nav.consents')}
+                </Link>
+                <Link
+                  to="/settings"
+                  className={`min-h-[38px] px-2.5 py-1.5 rounded-lg inline-flex items-center whitespace-nowrap transition-colors ${
+                    location.pathname === '/settings'
+                      ? 'text-teal-800 dark:text-teal-300 font-semibold bg-teal-50 dark:bg-teal-950/60'
+                      : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                  }`}
+                >
+                  {t('nav.settings')}
+                </Link>
+                {user.role === 'responder' && (
+                  <Link
+                    to="/responder"
+                    data-testid="nav-responder-link"
+                    className={`min-h-[38px] px-2.5 py-1.5 rounded-lg inline-flex items-center font-bold text-teal-800 dark:text-teal-300 whitespace-nowrap transition-colors ${
+                      location.pathname === '/responder'
+                        ? 'bg-teal-50 dark:bg-teal-950/60'
+                        : 'hover:underline underline-offset-4'
+                    }`}
+                  >
+                    {t('responderDashboard.title')}
+                  </Link>
+                )}
+                {user.role === 'admin' && (
+                  <Link
+                    to="/admin"
+                    data-testid="nav-admin-link"
+                    className={`min-h-[38px] px-2.5 py-1.5 rounded-lg inline-flex items-center font-bold text-teal-800 dark:text-teal-300 whitespace-nowrap transition-colors ${
+                      location.pathname.startsWith('/admin')
+                        ? 'bg-teal-50 dark:bg-teal-950/60'
+                        : 'hover:underline underline-offset-4'
+                    }`}
+                  >
+                    {t('admin.navLink')}
+                  </Link>
+                )}
+              </>
+            )}
+          </nav>
+        </div>
 
         {/* Zone 3: Primary controls + Persistent Connectivity Indicator + PWA Install */}
-        <div className="flex items-center gap-2">
+        <div className="shrink-0 flex items-center gap-2">
+          {/* Connectivity indicator (only shows warning when offline, sr-only when online) */}
           <span
             role="status"
             data-testid="connectivity-indicator"
-            className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded-md ${
+            className={
               isOnline
-                ? 'text-teal-800 dark:text-teal-300'
-                : 'text-amber-900 bg-amber-100 dark:bg-amber-950 dark:text-amber-200'
-            }`}
+                ? 'sr-only'
+                : 'inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md text-amber-900 bg-amber-100 dark:bg-amber-950 dark:text-amber-200'
+            }
           >
             {isOnline ? (
-              <>
-                <Wifi className="w-3.5 h-3.5" aria-hidden="true" />
-                <span className="hidden sm:inline">{t('offline.statusOnline')}</span>
-              </>
+              'Online'
             ) : (
               <>
                 <WifiOff className="w-3.5 h-3.5" aria-hidden="true" />

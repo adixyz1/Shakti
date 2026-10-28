@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "PORT=3000 tsx server.ts",
+    "dev": "PORT=3000 DEMO_MODE=true DEMO_ADMIN_HINT=true tsx server.ts",
     "start": "tsx server.ts",
     "start:prod": "npm run build && NODE_ENV=production tsx apps/api/server.ts",
     "test:offline:prod": "npm run build && tsx scripts/verify_offline_prod.ts",
@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:api": "vitest run apps/api/src/tests",
     "test:web": "vitest run apps/web/src/tests",
+    "check:tool-links": "tsx scripts/check_tool_links.ts",
     "e2e": "playwright test"
   },
   "dependencies": {

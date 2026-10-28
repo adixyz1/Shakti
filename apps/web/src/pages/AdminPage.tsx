@@ -31,11 +31,13 @@ import {
   adminRespondersApi,
   demoApi,
   resourcesPulseApi,
+  safetyToolsApi,
   type AdminResponderDto,
   type ImpactMetricsResponseDto,
   type IncidentAccessAuditDto,
   type MetricEntryDto,
   type ResourceDto,
+  type SafetyToolDto,
 } from '../lib/api';
 import { useDemoStore } from '../store/demoStore';
 
@@ -46,6 +48,14 @@ const RESOURCE_CATEGORY_OPTIONS = [
   'campus_security',
   'legal_aid',
   'counseling',
+] as const;
+
+const SAFETY_TOOL_CATEGORY_OPTIONS = [
+  'personal_alarm_keychain',
+  'whistle',
+  'torch_keyring',
+  'portable_door_alarm',
+  'pepper_spray',
 ] as const;
 
 export const AdminPage: React.FC = () => {
@@ -175,6 +185,22 @@ export const AdminPage: React.FC = () => {
   const [resFormDescription, setResFormDescription] = useState<string>('');
   const [isSavingResource, setIsSavingResource] = useState<boolean>(false);
 
+  const [safetyTools, setSafetyTools] = useState<SafetyToolDto[]>([]);
+  const [isLoadingSafetyTools, setIsLoadingSafetyTools] = useState<boolean>(false);
+  const [editingToolId, setEditingToolId] = useState<string | null>(null);
+  const [toolFormCategory, setToolFormCategory] = useState<string>('personal_alarm_keychain');
+  const [toolFormTitle, setToolFormTitle] = useState<string>('');
+  const [toolFormDesc, setToolFormDesc] = useState<string>('');
+  const [toolFormSafeUse, setToolFormSafeUse] = useState<string>('');
+  const [toolFormLegalNote, setToolFormLegalNote] = useState<string>('');
+  const [toolFormUrl, setToolFormUrl] = useState<string>('');
+  const [toolFormLinkLabel, setToolFormLinkLabel] = useState<string>('Add a trusted seller link');
+  const [toolFormLastChecked, setToolFormLastChecked] = useState<string>('2026-10-28');
+  const [toolFormActive, setToolFormActive] = useState<boolean>(true);
+  const [toolFormAffiliate, setToolFormAffiliate] = useState<boolean>(false);
+  const [isSavingTool, setIsSavingTool] = useState<boolean>(false);
+  const [toolFormError, setToolFormError] = useState<string | null>(null);
+
   const loadAuditLogs = useCallback(
     async (
       incFilter: string,
@@ -220,11 +246,24 @@ export const AdminPage: React.FC = () => {
     }
   }, []);
 
+  const loadSafetyTools = useCallback(async () => {
+    setIsLoadingSafetyTools(true);
+    try {
+      const res = await safetyToolsApi.listSafetyTools({ include_inactive: true });
+      setSafetyTools(res.safety_tools || []);
+    } catch {
+      setSafetyTools([]);
+    } finally {
+      setIsLoadingSafetyTools(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (activeTab === 'tools') {
       void loadAuditLogs(auditIncidentFilter, auditActorFilter);
       void loadResponders();
       void loadResources();
+      void loadSafetyTools();
     }
   }, [
     activeTab,
@@ -233,6 +272,7 @@ export const AdminPage: React.FC = () => {
     loadAuditLogs,
     loadResponders,
     loadResources,
+    loadSafetyTools,
   ]);
 
   const executeResponderUpdate = async (
@@ -319,6 +359,108 @@ export const AdminPage: React.FC = () => {
   const handleDeleteResource = async (id: string) => {
     await resourcesPulseApi.deleteResource(id);
     await loadResources();
+  };
+
+  const handleSaveSafetyTool = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setToolFormError(null);
+    if (
+      !toolFormTitle.trim() ||
+      !toolFormDesc.trim() ||
+      !toolFormSafeUse.trim() ||
+      !toolFormLegalNote.trim()
+    ) {
+      setToolFormError(
+        'Please fill in title, description, safe use notes, and legal note.'
+      );
+      return;
+    }
+    if (toolFormUrl.trim() && !toolFormUrl.trim().startsWith('https://')) {
+      setToolFormError('Link URL must use HTTPS protocol (https://)');
+      return;
+    }
+
+    setIsSavingTool(true);
+    try {
+      if (editingToolId) {
+        await safetyToolsApi.updateSafetyTool(editingToolId, {
+          category: toolFormCategory,
+          title: toolFormTitle.trim(),
+          description: toolFormDesc.trim(),
+          safe_use_notes: toolFormSafeUse.trim(),
+          legal_note: toolFormLegalNote.trim(),
+          link_url: toolFormUrl.trim() || null,
+          link_label: toolFormLinkLabel.trim() || 'Add a trusted seller link',
+          last_checked: toolFormLastChecked.trim() || '2026-10-28',
+          active: toolFormActive,
+          is_affiliate: toolFormAffiliate,
+        });
+      } else {
+        await safetyToolsApi.createSafetyTool({
+          category: toolFormCategory,
+          title: toolFormTitle.trim(),
+          description: toolFormDesc.trim(),
+          safe_use_notes: toolFormSafeUse.trim(),
+          legal_note: toolFormLegalNote.trim(),
+          link_url: toolFormUrl.trim() || null,
+          link_label: toolFormLinkLabel.trim() || 'Add a trusted seller link',
+          last_checked: toolFormLastChecked.trim() || '2026-10-28',
+          active: toolFormActive,
+          is_affiliate: toolFormAffiliate,
+        });
+      }
+      setEditingToolId(null);
+      setToolFormTitle('');
+      setToolFormDesc('');
+      setToolFormSafeUse('');
+      setToolFormLegalNote('');
+      setToolFormUrl('');
+      setToolFormLinkLabel('Add a trusted seller link');
+      setToolFormLastChecked('2026-10-28');
+      setToolFormActive(true);
+      setToolFormAffiliate(false);
+      await loadSafetyTools();
+    } catch (err: unknown) {
+      setToolFormError(
+        err instanceof Error ? err.message : 'Failed to save safety tool.'
+      );
+    } finally {
+      setIsSavingTool(false);
+    }
+  };
+
+  const handleEditToolClick = (tool: SafetyToolDto) => {
+    setEditingToolId(tool.id);
+    setToolFormCategory(tool.category);
+    setToolFormTitle(tool.title);
+    setToolFormDesc(tool.description);
+    setToolFormSafeUse(tool.safe_use_notes);
+    setToolFormLegalNote(tool.legal_note);
+    setToolFormUrl(tool.link_url || '');
+    setToolFormLinkLabel(tool.link_label);
+    setToolFormLastChecked(tool.last_checked);
+    setToolFormActive(tool.active);
+    setToolFormAffiliate(tool.is_affiliate);
+    setToolFormError(null);
+  };
+
+  const handleCancelEditTool = () => {
+    setEditingToolId(null);
+    setToolFormTitle('');
+    setToolFormDesc('');
+    setToolFormSafeUse('');
+    setToolFormLegalNote('');
+    setToolFormUrl('');
+    setToolFormLinkLabel('Add a trusted seller link');
+    setToolFormLastChecked('2026-10-28');
+    setToolFormActive(true);
+    setToolFormAffiliate(false);
+    setToolFormError(null);
+  };
+
+  const handleDeleteSafetyTool = async (id: string) => {
+    await safetyToolsApi.deleteSafetyTool(id);
+    await loadSafetyTools();
   };
 
   const formatMetricValue = (entry: MetricEntryDto): string => {
@@ -1026,7 +1168,7 @@ export const AdminPage: React.FC = () => {
               ) : auditEntries.length === 0 ? (
                 <p
                   data-testid="admin-audit-empty"
-                  className="text-sm text-slate-500 py-4"
+                  className="text-sm text-slate-600 dark:text-slate-300 py-4"
                 >
                   {t('admin.tools.auditEmpty')}
                 </p>
@@ -1218,6 +1360,291 @@ export const AdminPage: React.FC = () => {
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           {t('admin.tools.deleteResourceBtn')}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {/* 4. Safety Tools Guide Editor */}
+            <Card className="p-5 space-y-4" data-testid="admin-safety-tools-panel">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                  {t('safetyTools.admin.safetyToolsTitle')}
+                </h2>
+                {editingToolId && (
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                    Editing ID: {editingToolId}
+                  </span>
+                )}
+              </div>
+
+              {toolFormError && (
+                <div
+                  data-testid="admin-tool-error-msg"
+                  className="p-3 text-xs font-semibold rounded-xl bg-rose-50 border border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-200"
+                >
+                  {toolFormError}
+                </div>
+              )}
+
+              <form
+                onSubmit={handleSaveSafetyTool}
+                className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-xl border border-slate-200 dark:border-slate-800 text-left"
+              >
+                <div>
+                  <label
+                    htmlFor="admin-tool-title"
+                    className="block text-xs font-semibold mb-1"
+                  >
+                    {t('safetyTools.admin.titleLabel')}
+                  </label>
+                  <input
+                    id="admin-tool-title"
+                    type="text"
+                    data-testid="admin-tool-title-input"
+                    value={toolFormTitle}
+                    onChange={(e) => setToolFormTitle(e.target.value)}
+                    className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="admin-tool-category"
+                    className="block text-xs font-semibold mb-1"
+                  >
+                    {t('safetyTools.admin.categoryLabel')}
+                  </label>
+                  <select
+                    id="admin-tool-category"
+                    data-testid="admin-tool-category-select"
+                    value={toolFormCategory}
+                    onChange={(e) => setToolFormCategory(e.target.value)}
+                    className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
+                  >
+                    {SAFETY_TOOL_CATEGORY_OPTIONS.map((c) => (
+                      <option key={c} value={c}>
+                        {t(`safetyTools.categories.${c}`, { defaultValue: c })}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label
+                    htmlFor="admin-tool-desc"
+                    className="block text-xs font-semibold mb-1"
+                  >
+                    {t('safetyTools.admin.descriptionLabel')}
+                  </label>
+                  <textarea
+                    id="admin-tool-desc"
+                    rows={2}
+                    data-testid="admin-tool-desc-input"
+                    value={toolFormDesc}
+                    onChange={(e) => setToolFormDesc(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="admin-tool-safe-use"
+                    className="block text-xs font-semibold mb-1"
+                  >
+                    {t('safetyTools.admin.safeUseLabel')}
+                  </label>
+                  <textarea
+                    id="admin-tool-safe-use"
+                    rows={2}
+                    data-testid="admin-tool-safe-use-input"
+                    value={toolFormSafeUse}
+                    onChange={(e) => setToolFormSafeUse(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="admin-tool-legal-note"
+                    className="block text-xs font-semibold mb-1"
+                  >
+                    {t('safetyTools.admin.legalNoteLabel')}
+                  </label>
+                  <textarea
+                    id="admin-tool-legal-note"
+                    rows={2}
+                    data-testid="admin-tool-legal-note-input"
+                    value={toolFormLegalNote}
+                    onChange={(e) => setToolFormLegalNote(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="admin-tool-url"
+                    className="block text-xs font-semibold mb-1"
+                  >
+                    {t('safetyTools.admin.urlLabel')}
+                  </label>
+                  <input
+                    id="admin-tool-url"
+                    type="url"
+                    placeholder="https://"
+                    data-testid="admin-tool-url-input"
+                    value={toolFormUrl}
+                    onChange={(e) => setToolFormUrl(e.target.value)}
+                    className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="admin-tool-link-label"
+                    className="block text-xs font-semibold mb-1"
+                  >
+                    {t('safetyTools.admin.linkLabelLabel')}
+                  </label>
+                  <input
+                    id="admin-tool-link-label"
+                    type="text"
+                    data-testid="admin-tool-link-label-input"
+                    value={toolFormLinkLabel}
+                    onChange={(e) => setToolFormLinkLabel(e.target.value)}
+                    className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="admin-tool-last-checked"
+                    className="block text-xs font-semibold mb-1"
+                  >
+                    {t('safetyTools.admin.lastCheckedLabel')}
+                  </label>
+                  <input
+                    id="admin-tool-last-checked"
+                    type="text"
+                    placeholder="YYYY-MM-DD"
+                    data-testid="admin-tool-last-checked-input"
+                    value={toolFormLastChecked}
+                    onChange={(e) => setToolFormLastChecked(e.target.value)}
+                    className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
+                  />
+                </div>
+
+                <div className="flex items-center gap-6 pt-5">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold">
+                    <input
+                      type="checkbox"
+                      data-testid="admin-tool-affiliate-checkbox"
+                      checked={toolFormAffiliate}
+                      onChange={(e) => setToolFormAffiliate(e.target.checked)}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span>{t('safetyTools.admin.isAffiliateLabel')}</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold">
+                    <input
+                      type="checkbox"
+                      data-testid="admin-tool-active-checkbox"
+                      checked={toolFormActive}
+                      onChange={(e) => setToolFormActive(e.target.checked)}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span>{t('safetyTools.admin.activeLabel')}</span>
+                  </label>
+                </div>
+
+                <div className="sm:col-span-2 flex items-center gap-2 pt-2">
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    data-testid="admin-tool-save-btn"
+                    isLoading={isSavingTool}
+                  >
+                    {editingToolId
+                      ? t('safetyTools.admin.saveToolBtn')
+                      : t('safetyTools.admin.addToolBtn')}
+                  </Button>
+                  {editingToolId && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      data-testid="admin-tool-cancel-btn"
+                      onClick={handleCancelEditTool}
+                    >
+                      {t('safetyTools.admin.cancelEditBtn')}
+                    </Button>
+                  )}
+                </div>
+              </form>
+
+              {isLoadingSafetyTools ? (
+                <Spinner className="w-6 h-6 text-teal-700" />
+              ) : (
+                <div
+                  className="divide-y divide-slate-200 dark:divide-slate-800 text-left"
+                  data-testid="admin-safety-tools-list"
+                >
+                  {safetyTools.map((tool) => (
+                    <div
+                      key={tool.id}
+                      data-testid={`admin-tool-row-${tool.id}`}
+                      className="py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                            {tool.title}
+                          </p>
+                          {tool.is_affiliate && (
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                              Affiliate
+                            </span>
+                          )}
+                          {!tool.active && (
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-400">
+                          {t(`safetyTools.categories.${tool.category}`, {
+                            defaultValue: tool.category,
+                          })}{' '}
+                          · Last checked: {tool.last_checked}
+                          {tool.link_url ? ` · ${tool.link_url}` : ` · ${t('safetyTools.noLinksAddedYet')}`}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          data-testid={`admin-edit-tool-${tool.id}`}
+                          onClick={() => handleEditToolClick(tool)}
+                          className="min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-300 dark:border-slate-700 inline-flex items-center gap-1"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          {t('safetyTools.admin.editToolBtn')}
+                        </button>
+                        <button
+                          type="button"
+                          data-testid={`admin-delete-tool-${tool.id}`}
+                          onClick={() => void handleDeleteSafetyTool(tool.id)}
+                          className="min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold border border-rose-300 text-rose-700 inline-flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          {t('safetyTools.admin.deleteToolBtn')}
                         </button>
                       </div>
                     </div>

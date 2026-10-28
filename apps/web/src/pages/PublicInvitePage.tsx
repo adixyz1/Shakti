@@ -92,59 +92,65 @@ export const PublicInvitePage: React.FC = () => {
 
   return (
     <PageLayout>
-      <div className="max-w-lg mx-auto py-6 space-y-6">
+      <div className="max-w-lg mx-auto py-4 space-y-5 text-ink">
         {isLoading ? (
-          <div className="py-12 flex justify-center text-teal-700 dark:text-teal-400">
+          <div className="py-12 flex justify-center text-teal-700">
             <Spinner className="w-8 h-8" />
           </div>
         ) : outcome === 'accepted' ? (
-          <Card className="space-y-3">
-            <h1 className="text-2xl font-semibold text-teal-800 dark:text-teal-400">
-              {t('invite.acceptedTitle')}
-            </h1>
-            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+          <Card className="space-y-3 border border-line bg-surface rounded-2xl p-5">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 bg-teal-700 rounded-full shrink-0" />
+              <h1 className="text-xl font-bold text-teal-700">
+                {t('invite.acceptedTitle')}
+              </h1>
+            </div>
+            <p className="text-xs md:text-sm text-muted leading-relaxed">
               {t('invite.acceptedBody', {
                 inviter: details?.inviter_name || 'your contact',
               })}
             </p>
           </Card>
         ) : outcome === 'declined' ? (
-          <Card className="space-y-3">
-            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+          <Card className="space-y-3 border border-line bg-surface rounded-2xl p-5">
+            <h1 className="text-xl font-bold text-ink">
               {t('invite.declinedTitle')}
             </h1>
-            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+            <p className="text-xs md:text-sm text-muted leading-relaxed">
               {t('invite.declinedBody')}
             </p>
           </Card>
         ) : errorMsg || !details ? (
-          <Card className="space-y-3">
-            <h1 className="text-2xl font-semibold text-rose-700 dark:text-rose-400">
+          <Card className="space-y-3 border-2 border-crimson-800 bg-surface rounded-2xl p-5">
+            <h1 className="text-xl font-bold text-crimson-800">
               {t('invite.expiredTitle')}
             </h1>
-            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+            <p className="text-xs md:text-sm text-muted leading-relaxed">
               {errorMsg || t('invite.expiredBody')}
             </p>
           </Card>
         ) : (
-          <Card className="space-y-6">
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-teal-700 dark:text-teal-400">
-                {t('invite.kicker')}
-              </p>
-              <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+          <Card className="space-y-5 border border-line bg-surface rounded-2xl p-5">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-teal-700 rounded-full shrink-0" />
+                <p className="text-xs font-mono uppercase tracking-wider text-teal-700 font-semibold">
+                  {t('invite.kicker')}
+                </p>
+              </div>
+              <h1 className="text-xl md:text-2xl font-bold text-ink">
                 {t('invite.title', { inviter: details.inviter_name })}
               </h1>
-              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              <p className="text-xs text-muted leading-relaxed">
                 {t('invite.subtitle', { contact: details.contact_name })}
               </p>
             </div>
 
-            <div className="space-y-3 border-t border-b border-slate-100 dark:border-slate-800 py-4">
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <div className="space-y-2 border-t border-b border-line py-3">
+              <h2 className="text-xs font-mono uppercase tracking-wider font-bold text-ink">
                 {t('invite.whatYouReceiveTitle')}
               </h2>
-              <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300 list-disc pl-5">
+              <ul className="space-y-1.5 text-xs text-muted list-disc pl-4">
                 <li>
                   {details.permissions.receives_sos
                     ? t('invite.permSosYes', { inviter: details.inviter_name })
@@ -163,11 +169,11 @@ export const PublicInvitePage: React.FC = () => {
               </ul>
             </div>
 
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            <p className="text-xs font-mono text-muted leading-relaxed">
               {t('invite.privacyNotice', { inviter: details.inviter_name })}
             </p>
 
-            <div className="space-y-3 pt-2">
+            <div className="space-y-2 pt-1 border-t border-line">
               <BigButton
                 type="button"
                 variant="primary"

@@ -72,11 +72,16 @@ export const SettingsPage: React.FC = () => {
     fakeCallDelaySeconds,
     setFakeCallCallerName,
     setFakeCallDelaySeconds,
+    guestCancelPinHash,
+    guestCancelWindowSeconds,
+    configureGuestCancelPin,
+    clearGuestCancelPin,
+    setGuestCancelWindowSeconds,
   } = useTriggerSettingsStore();
 
   // Cancel Window (0-10s)
   const [cancelWindowSeconds, setCancelWindowSeconds] = useState<number>(
-    user?.cancel_window_seconds ?? 5
+    user?.cancel_window_seconds ?? guestCancelWindowSeconds ?? 5
   );
   const [isSavingWindow, setIsSavingWindow] = useState(false);
 
@@ -194,6 +199,11 @@ export const SettingsPage: React.FC = () => {
 
   const handleSaveCancelWindow = async (nextSec: number) => {
     setCancelWindowSeconds(nextSec);
+    if (!user) {
+      setGuestCancelWindowSeconds(nextSec);
+      addToast(t('settings.cancelWindowSaved'), 'success');
+      return;
+    }
     setIsSavingWindow(true);
     try {
       const res = await settingsApi.updateCancelWindow(nextSec);
@@ -294,12 +304,14 @@ export const SettingsPage: React.FC = () => {
     setPinSetupError(null);
     try {
       if (pinTarget === 'cancel') {
-        await settingsApi.updateCancelPin(confirmPinEntry);
-        setTransientKnownCancelPin(confirmPinEntry);
         if (user) {
+          await settingsApi.updateCancelPin(confirmPinEntry);
+          setTransientKnownCancelPin(confirmPinEntry);
           setUser({ ...user, has_cancel_pin: true });
+          await refreshUserProfile();
+        } else {
+          await configureGuestCancelPin(confirmPinEntry);
         }
-        await refreshUserProfile();
         addToast(t('settings.pins.savedCancelPin'), 'success');
       } else {
         await settingsApi.updateDuressPin({
@@ -329,12 +341,14 @@ export const SettingsPage: React.FC = () => {
     setIsSavingPin(true);
     try {
       if (target === 'cancel') {
-        await settingsApi.updateCancelPin(null);
-        setTransientKnownCancelPin(null);
         if (user) {
+          await settingsApi.updateCancelPin(null);
+          setTransientKnownCancelPin(null);
           setUser({ ...user, has_cancel_pin: false });
+          await refreshUserProfile();
+        } else {
+          clearGuestCancelPin();
         }
-        await refreshUserProfile();
         addToast(t('settings.pins.removedCancelPin'), 'info');
       } else {
         await settingsApi.updateDuressPin({ pin: null });
@@ -424,6 +438,72 @@ export const SettingsPage: React.FC = () => {
       }
     } else {
       setShakePermissionState('granted');
+    }
+  };
+
+  const handleGuestGrantMotion = async () => {
+    if (shakeEnabled && shakePermissionState === 'granted') {
+      setShakeEnabled(false);
+      addToast(t('guestSettings.shakeDisabledToast'), 'info');
+      return;
+    }
+    const DeviceMotionEventAny = typeof window !== 'undefined'
+      ? (window as unknown as { DeviceMotionEvent?: { requestPermission?: () => Promise<'granted' | 'denied'> } }).DeviceMotionEvent
+      : undefined;
+
+    if (
+      DeviceMotionEventAny &&
+      typeof DeviceMotionEventAny.requestPermission === 'function'
+    ) {
+      try {
+        const result = await DeviceMotionEventAny.requestPermission();
+        if (result === 'granted') {
+          setShakePermissionState('granted');
+          setShakeEnabled(true);
+          addToast(t('guestSettings.shakeGrantedToast'), 'success');
+        } else {
+          setShakePermissionState('denied');
+          setShakeEnabled(false);
+          addToast(t('guestSettings.shakeDeniedToast'), 'error');
+        }
+      } catch {
+        setShakePermissionState('denied');
+        setShakeEnabled(false);
+      }
+    } else {
+      setShakePermissionState('granted');
+      setShakeEnabled(true);
+      addToast(t('guestSettings.shakeGrantedToast'), 'success');
+    }
+  };
+
+  const handleGuestGrantVoice = async () => {
+    if (voiceEnabled && voiceConsentGranted) {
+      setVoiceEnabled(false);
+      setVoiceConsentGranted(false);
+      addToast(t('guestSettings.voiceDisabledToast'), 'info');
+      return;
+    }
+    if (
+      typeof navigator !== 'undefined' &&
+      navigator.mediaDevices &&
+      typeof navigator.mediaDevices.getUserMedia === 'function'
+    ) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+        setVoiceConsentGranted(true);
+        setVoiceEnabled(true);
+        addToast(t('guestSettings.voiceGrantedToast'), 'success');
+      } catch {
+        setVoiceConsentGranted(false);
+        setVoiceEnabled(false);
+        addToast(t('guestSettings.voiceDeniedToast'), 'error');
+      }
+    } else {
+      setVoiceConsentGranted(true);
+      setVoiceEnabled(true);
+      addToast(t('guestSettings.voiceGrantedToast'), 'success');
     }
   };
 
@@ -559,7 +639,7 @@ export const SettingsPage: React.FC = () => {
   return (
     <PageLayout>
       <div className="space-y-8 py-4 max-w-3xl">
-        <header className="space-y-2 border-b border-slate-200 dark:border-slate-800 pb-6">
+        <header className="space-y-2 border-b border-line dark:border-night-line pb-6">
           <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 dark:text-slate-50">
             {t('settings.title')}
           </h1>
@@ -573,7 +653,7 @@ export const SettingsPage: React.FC = () => {
           role="region"
           aria-label={t('settings.safetyWordingTitle')}
           data-testid="settings-safety-wording"
-          className="rounded-2xl border border-amber-400 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/50 p-5 space-y-2"
+          className="rounded-xl border border-amber-400 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/50 p-5 space-y-2"
         >
           <div className="flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
@@ -593,7 +673,7 @@ export const SettingsPage: React.FC = () => {
           <div
             role="status"
             data-testid="practice-active-banner"
-            className="rounded-2xl border-2 border-teal-600 bg-teal-50 dark:bg-teal-950/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+            className="rounded-xl border-2 border-teal-600 bg-teal-50 dark:bg-teal-950/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
           >
             <p className="text-sm font-semibold text-teal-950 dark:text-teal-100">
               {t('settings.triggers.practiceActiveBanner', {
@@ -618,7 +698,7 @@ export const SettingsPage: React.FC = () => {
           <div
             role="status"
             data-testid="practice-success-banner"
-            className="rounded-2xl border-2 border-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 p-4 flex items-center gap-3"
+            className="rounded-xl border-2 border-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 p-4 flex items-center gap-3"
           >
             <CheckCircle2 className="w-6 h-6 text-emerald-700 dark:text-emerald-400 shrink-0" />
             <p className="text-sm font-semibold text-emerald-950 dark:text-emerald-100">
@@ -700,7 +780,7 @@ export const SettingsPage: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Cancel PIN Box */}
-            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 flex flex-col justify-between">
+            <div className="rounded-xl border border-line dark:border-night-line p-4 space-y-3 flex flex-col justify-between">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
@@ -710,7 +790,7 @@ export const SettingsPage: React.FC = () => {
                     data-testid="cancel-pin-status"
                     className="text-xs font-semibold text-teal-700 dark:text-teal-400"
                   >
-                    {user?.has_cancel_pin
+                    {(user ? user.has_cancel_pin : Boolean(guestCancelPinHash))
                       ? t('settings.pins.statusConfigured')
                       : t('settings.pins.statusNotConfigured')}
                   </span>
@@ -728,7 +808,7 @@ export const SettingsPage: React.FC = () => {
                 >
                   {t('settings.pins.setCancelPinBtn')}
                 </BigButton>
-                {user?.has_cancel_pin && (
+                {((user && user.has_cancel_pin) || (!user && Boolean(guestCancelPinHash))) && (
                   <BigButton
                     type="button"
                     variant="outline"
@@ -742,45 +822,64 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             {/* Duress PIN Box */}
-            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 flex flex-col justify-between">
+            <div className="rounded-xl border border-line dark:border-night-line p-4 space-y-3 flex flex-col justify-between">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                     {t('settings.pins.duressPinTitle')}
                   </h3>
-                  <span
-                    data-testid="duress-pin-status"
-                    className="text-xs font-semibold text-teal-700 dark:text-teal-400"
-                  >
-                    {user?.has_duress_pin
-                      ? t('settings.pins.statusConfigured')
-                      : t('settings.pins.statusNotConfigured')}
-                  </span>
+                  {user && (
+                    <span
+                      data-testid="duress-pin-status"
+                      className="text-xs font-semibold text-teal-700 dark:text-teal-400"
+                    >
+                      {user.has_duress_pin
+                        ? t('settings.pins.statusConfigured')
+                        : t('settings.pins.statusNotConfigured')}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                   {t('settings.pins.duressPinDesc')}
                 </p>
               </div>
-              <div className="space-y-2 pt-2">
-                <BigButton
-                  type="button"
-                  variant="secondary"
-                  data-testid="open-duress-pin-setup-btn"
-                  onClick={() => startPinSetup('duress')}
-                >
-                  {t('settings.pins.setDuressPinBtn')}
-                </BigButton>
-                {user?.has_duress_pin && (
+              {user ? (
+                <div className="space-y-2 pt-2">
                   <BigButton
                     type="button"
-                    variant="outline"
-                    data-testid="remove-duress-pin-btn"
-                    onClick={() => void handleRemovePin('duress')}
+                    variant="secondary"
+                    data-testid="open-duress-pin-setup-btn"
+                    onClick={() => startPinSetup('duress')}
                   >
-                    {t('settings.pins.removeDuressPinBtn')}
+                    {t('settings.pins.setDuressPinBtn')}
                   </BigButton>
-                )}
-              </div>
+                  {user.has_duress_pin && (
+                    <BigButton
+                      type="button"
+                      variant="outline"
+                      data-testid="remove-duress-pin-btn"
+                      onClick={() => void handleRemovePin('duress')}
+                    >
+                      {t('settings.pins.removeDuressPinBtn')}
+                    </BigButton>
+                  )}
+                </div>
+              ) : (
+                <div data-testid="duress-guest-notice" className="space-y-2 pt-2">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-line dark:border-slate-800 rounded-xl space-y-2">
+                    <p className="text-xs text-muted dark:text-slate-400 leading-relaxed font-medium">
+                      {t('guestPin.duressAccountRequired')}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate('/login')}
+                    >
+                      {t('guestPin.duressSignInCta')}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -788,7 +887,7 @@ export const SettingsPage: React.FC = () => {
           {pinTarget && (
             <div
               data-testid="settings-pin-keypad"
-              className="rounded-2xl border-2 border-teal-600 bg-slate-50 dark:bg-slate-900 p-5 space-y-4"
+              className="rounded-xl border-2 border-teal-600 bg-slate-50 dark:bg-slate-900 p-5 space-y-4"
             >
               <div className="text-center space-y-1">
                 <h3
@@ -907,6 +1006,105 @@ export const SettingsPage: React.FC = () => {
           )}
         </Card>
 
+        {/* Guest Local Permissions Section */}
+        {!user && (
+          <Card className="space-y-4" data-testid="guest-permissions-section">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-teal-700 dark:text-teal-400" />
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  {t('guestSettings.permissionsTitle')}
+                </h2>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                {t('guestSettings.permissionsSubtitle')}
+              </p>
+            </div>
+
+            {/* Shake Trigger Permission */}
+            <div
+              data-testid="guest-shake-permission-card"
+              className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {t('guestSettings.shakeTitle')}
+                  </span>
+                </div>
+                <span
+                  data-testid="guest-shake-status"
+                  className={`text-xs font-semibold ${
+                    shakeEnabled && shakePermissionState === 'granted'
+                      ? 'text-teal-700 dark:text-teal-400'
+                      : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  {shakeEnabled && shakePermissionState === 'granted'
+                    ? t('guestSettings.statusGranted')
+                    : t('guestSettings.statusNotGranted')}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                {t('guestSettings.shakeNote')}
+              </p>
+              <Button
+                type="button"
+                variant={shakeEnabled && shakePermissionState === 'granted' ? 'outline' : 'secondary'}
+                data-testid="guest-grant-motion-btn"
+                onClick={handleGuestGrantMotion}
+                className="w-full"
+              >
+                {shakeEnabled && shakePermissionState === 'granted'
+                  ? t('guestSettings.disableShakeBtn')
+                  : t('guestSettings.enableShakeBtn')}
+              </Button>
+            </div>
+
+            {/* Voice Trigger Permission */}
+            <div
+              data-testid="guest-voice-permission-card"
+              className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Mic className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {t('guestSettings.voiceTitle')}
+                  </span>
+                </div>
+                <span
+                  data-testid="guest-voice-status"
+                  className={`text-xs font-semibold ${
+                    voiceEnabled && voiceConsentGranted
+                      ? 'text-teal-700 dark:text-teal-400'
+                      : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  {voiceEnabled && voiceConsentGranted
+                    ? t('guestSettings.statusGranted')
+                    : t('guestSettings.statusNotGranted')}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                {t('guestSettings.voiceNote')}
+              </p>
+              <Button
+                type="button"
+                variant={voiceEnabled && voiceConsentGranted ? 'outline' : 'secondary'}
+                data-testid="guest-grant-mic-btn"
+                onClick={handleGuestGrantVoice}
+                className="w-full"
+              >
+                {voiceEnabled && voiceConsentGranted
+                  ? t('guestSettings.disableVoiceBtn')
+                  : t('guestSettings.enableVoiceBtn')}
+              </Button>
+            </div>
+          </Card>
+        )}
+
         {/* Task 5 & Fix 1: Disguise Mode (Calculator) — No default sequence; requires min length 4 + confirm entry */}
         <Card className="space-y-4" data-testid="disguise-settings-card">
           <div className="flex items-start justify-between gap-4">
@@ -960,7 +1158,7 @@ export const SettingsPage: React.FC = () => {
           {showDisguiseSetup || !disguiseSequenceHash ? (
             <div
               data-testid="disguise-sequence-setup"
-              className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3"
+              className="rounded-xl border border-line dark:border-night-line p-4 space-y-3"
             >
               <Input
                 label={t('settings.disguise.secretSequenceLabel')}
@@ -1360,7 +1558,7 @@ export const SettingsPage: React.FC = () => {
                 {showVoiceSetup || !voiceCodewordHash ? (
                   <div
                     data-testid="voice-codeword-setup"
-                    className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3"
+                    className="rounded-xl border border-line dark:border-night-line p-4 space-y-3"
                   >
                     <Input
                       label={t('settings.triggers.voiceCodewordLabel')}
@@ -1600,12 +1798,31 @@ export const SettingsPage: React.FC = () => {
                 {t('home.startOnboardingBtn')}
               </Button>
             </Card>
+
+            <Card className="space-y-3" data-testid="settings-safety-tools-card">
+              <div className="space-y-1">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                  {t('safetyTools.title')}
+                </h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  {t('safetyTools.subtitle')}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                data-testid="settings-safety-tools-link"
+                onClick={() => navigate('/safety-tools')}
+              >
+                {t('safetyTools.navLink')}
+              </Button>
+            </Card>
           </div>
         </section>
 
         {/* Phase 8C Task 4 & 5: Privacy Tools & Emergency Data Policy */}
         <section
-          className="space-y-4 pt-2 border-t border-slate-200 dark:border-slate-800"
+          className="space-y-4 pt-2 border-t border-line dark:border-night-line"
           data-testid="privacy-tools-section"
         >
           <div className="space-y-1">
@@ -1630,26 +1847,28 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {/* 1. Download my data */}
-          <Card className="space-y-3" data-testid="download-data-card">
-            <div className="space-y-1">
-              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                {t('privacyTools.exportTitle')}
-              </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                {t('privacyTools.exportBody')}
-              </p>
-            </div>
-            <BigButton
-              type="button"
-              variant="secondary"
-              data-testid="download-my-data-btn"
-              isLoading={isExportingData}
-              onClick={() => void handleDownloadMyData()}
-            >
-              <Download className="w-5 h-5 mr-2" />
-              {t('privacyTools.exportBtn')}
-            </BigButton>
-          </Card>
+          {user && (
+            <Card className="space-y-3" data-testid="download-data-card">
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  {t('privacyTools.exportTitle')}
+                </h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  {t('privacyTools.exportBody')}
+                </p>
+              </div>
+              <BigButton
+                type="button"
+                variant="secondary"
+                data-testid="download-my-data-btn"
+                isLoading={isExportingData}
+                onClick={() => void handleDownloadMyData()}
+              >
+                <Download className="w-5 h-5 mr-2" />
+                {t('privacyTools.exportBtn')}
+              </BigButton>
+            </Card>
+          )}
 
           {/* 2. Clear local data on this device */}
           <Card className="space-y-3" data-testid="clear-local-data-card">
@@ -1674,125 +1893,127 @@ export const SettingsPage: React.FC = () => {
           </Card>
 
           {/* 3. Delete my account */}
-          <Card
-            className="space-y-4 border-rose-200 dark:border-rose-900/60"
-            data-testid="delete-account-card"
-          >
-            <div className="space-y-1">
-              <h3 className="text-base font-bold text-rose-800 dark:text-rose-300">
-                {t('privacyTools.deleteAccountTitle')}
-              </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                {t('privacyTools.deleteAccountBody')}
-              </p>
-            </div>
-
-            {!showDeleteAccountForm ? (
-              <BigButton
-                type="button"
-                variant="danger"
-                data-testid="open-delete-account-btn"
-                onClick={() => {
-                  setShowDeleteAccountForm(true);
-                  setDeleteError(null);
-                }}
-              >
-                {t('privacyTools.deleteOpenBtn')}
-              </BigButton>
-            ) : (
-              <div
-                data-testid="delete-account-confirm-box"
-                className="rounded-2xl border-2 border-rose-500 bg-rose-50/70 dark:bg-rose-950/40 p-4 space-y-4"
-              >
-                <p className="text-sm font-semibold text-rose-950 dark:text-rose-100">
+          {user && (
+            <Card
+              className="space-y-4 border-rose-200 dark:border-rose-900/60"
+              data-testid="delete-account-card"
+            >
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-rose-800 dark:text-rose-300">
                   {t('privacyTools.deleteAccountTitle')}
+                </h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  {t('privacyTools.deleteAccountBody')}
                 </p>
+              </div>
 
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      {t('privacyTools.reauthOtpLabel')}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      data-testid="delete-request-otp-btn"
-                      onClick={() => void handleRequestDeleteOtp()}
-                    >
-                      {t('privacyTools.sendOtpBtn')}
-                    </Button>
+              {!showDeleteAccountForm ? (
+                <BigButton
+                  type="button"
+                  variant="danger"
+                  data-testid="open-delete-account-btn"
+                  onClick={() => {
+                    setShowDeleteAccountForm(true);
+                    setDeleteError(null);
+                  }}
+                >
+                  {t('privacyTools.deleteOpenBtn')}
+                </BigButton>
+              ) : (
+                <div
+                  data-testid="delete-account-confirm-box"
+                  className="rounded-xl border-2 border-rose-500 bg-rose-50/70 dark:bg-rose-950/40 p-4 space-y-4"
+                >
+                  <p className="text-sm font-semibold text-rose-950 dark:text-rose-100">
+                    {t('privacyTools.deleteAccountTitle')}
+                  </p>
+
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        {t('privacyTools.reauthOtpLabel')}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        data-testid="delete-request-otp-btn"
+                        onClick={() => void handleRequestDeleteOtp()}
+                      >
+                        {t('privacyTools.sendOtpBtn')}
+                      </Button>
+                    </div>
+                    <Input
+                      label={t('privacyTools.reauthOtpLabel')}
+                      data-testid="delete-account-otp-input"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="6-digit OTP"
+                      value={deleteOtpInput}
+                      onChange={(e) => {
+                        setDeleteOtpInput(e.target.value);
+                        setDeleteError(null);
+                      }}
+                    />
+                    {deleteOtpDevCode && (
+                      <p
+                        data-testid="delete-dev-otp-hint"
+                        className="text-xs font-mono text-slate-600 dark:text-slate-300"
+                      >
+                        {t('privacyTools.otpSentHint', { code: deleteOtpDevCode })}
+                      </p>
+                    )}
                   </div>
+
                   <Input
-                    label={t('privacyTools.reauthOtpLabel')}
-                    data-testid="delete-account-otp-input"
+                    label={t('privacyTools.typeDeleteLabel')}
+                    data-testid="delete-account-word-input"
                     type="text"
-                    inputMode="numeric"
-                    placeholder="6-digit OTP"
-                    value={deleteOtpInput}
+                    placeholder="DELETE"
+                    value={deleteConfirmInput}
                     onChange={(e) => {
-                      setDeleteOtpInput(e.target.value);
+                      setDeleteConfirmInput(e.target.value);
                       setDeleteError(null);
                     }}
                   />
-                  {deleteOtpDevCode && (
+
+                  {deleteError && (
                     <p
-                      data-testid="delete-dev-otp-hint"
-                      className="text-xs font-mono text-slate-600 dark:text-slate-400"
+                      role="alert"
+                      data-testid="delete-account-error"
+                      className="text-sm font-semibold text-rose-700 dark:text-rose-300"
                     >
-                      {t('privacyTools.otpSentHint', { code: deleteOtpDevCode })}
+                      {deleteError}
                     </p>
                   )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <BigButton
+                      type="button"
+                      variant="danger"
+                      data-testid="confirm-delete-account-btn"
+                      isLoading={isDeletingAccount}
+                      onClick={() => void handleConfirmDeleteAccount()}
+                    >
+                      {t('privacyTools.confirmDeleteBtn')}
+                    </BigButton>
+                    <BigButton
+                      type="button"
+                      variant="outline"
+                      data-testid="cancel-delete-account-btn"
+                      onClick={() => {
+                        setShowDeleteAccountForm(false);
+                        setDeleteError(null);
+                        setDeleteOtpInput('');
+                        setDeleteConfirmInput('');
+                      }}
+                    >
+                      {t('privacyTools.deleteCancelBtn')}
+                    </BigButton>
+                  </div>
                 </div>
-
-                <Input
-                  label={t('privacyTools.typeDeleteLabel')}
-                  data-testid="delete-account-word-input"
-                  type="text"
-                  placeholder="DELETE"
-                  value={deleteConfirmInput}
-                  onChange={(e) => {
-                    setDeleteConfirmInput(e.target.value);
-                    setDeleteError(null);
-                  }}
-                />
-
-                {deleteError && (
-                  <p
-                    role="alert"
-                    data-testid="delete-account-error"
-                    className="text-sm font-semibold text-rose-700 dark:text-rose-300"
-                  >
-                    {deleteError}
-                  </p>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <BigButton
-                    type="button"
-                    variant="danger"
-                    data-testid="confirm-delete-account-btn"
-                    isLoading={isDeletingAccount}
-                    onClick={() => void handleConfirmDeleteAccount()}
-                  >
-                    {t('privacyTools.confirmDeleteBtn')}
-                  </BigButton>
-                  <BigButton
-                    type="button"
-                    variant="outline"
-                    data-testid="cancel-delete-account-btn"
-                    onClick={() => {
-                      setShowDeleteAccountForm(false);
-                      setDeleteError(null);
-                      setDeleteOtpInput('');
-                      setDeleteConfirmInput('');
-                    }}
-                  >
-                    {t('privacyTools.deleteCancelBtn')}
-                  </BigButton>
-                </div>
-              </div>
-            )}
-          </Card>
+              )}
+            </Card>
+          )}
         </section>
       </div>
     </PageLayout>

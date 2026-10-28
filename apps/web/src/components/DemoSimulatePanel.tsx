@@ -82,14 +82,14 @@ export const DemoSimulatePanel: React.FC<{
   return (
     <Card
       data-testid="demo-simulate-panel"
-      className="border-2 border-amber-400 dark:border-amber-700 bg-amber-50/70 dark:bg-amber-950/30 p-5 space-y-4"
+      className="border border-amber-500/70 dark:border-amber-700 bg-amber-50/40 dark:bg-amber-950/20 rounded-2xl p-5 space-y-4"
     >
       <div className="space-y-1">
         <div className="flex items-center gap-2 text-amber-950 dark:text-amber-200">
           <Play className="w-4 h-4 shrink-0" />
           <h3 className="text-sm font-bold">{t('demo.panel.title')}</h3>
         </div>
-        <p className="text-xs text-slate-600 dark:text-slate-300">
+        <p className="text-xs text-muted dark:text-night-muted">
           {t('demo.panel.subtitle')}
         </p>
       </div>
@@ -98,7 +98,7 @@ export const DemoSimulatePanel: React.FC<{
         <div
           role="status"
           data-testid="demo-simulate-feedback"
-          className="rounded-xl border border-teal-500/50 bg-teal-50 dark:bg-teal-950/60 px-3 py-2 text-xs font-semibold text-teal-900 dark:text-teal-200"
+          className="rounded-xl border border-teal-700/60 bg-teal-50 dark:bg-teal-950/60 px-3 py-2 text-xs font-semibold text-teal-900 dark:text-teal-200"
         >
           {feedback}
         </div>
@@ -108,7 +108,7 @@ export const DemoSimulatePanel: React.FC<{
         <div
           role="alert"
           data-testid="demo-simulate-error"
-          className="rounded-xl border border-rose-400 bg-rose-50 dark:bg-rose-950/60 px-3 py-2 text-xs font-semibold text-rose-800 dark:text-rose-200"
+          className="rounded-xl border border-crimson-800/60 bg-red-50 dark:bg-red-950/60 px-3 py-2 text-xs font-semibold text-crimson-800 dark:text-red-300"
         >
           {errorMsg}
         </div>

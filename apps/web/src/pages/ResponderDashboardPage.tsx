@@ -100,7 +100,7 @@ const ResponderLeafletMap: React.FC<{
       role="region"
       data-testid="responder-leaflet-map"
       aria-label={`Map showing latest location (${lat.toFixed(5)}, ${lng.toFixed(5)})`}
-      className="w-full h-60 rounded-2xl border border-slate-300 dark:border-slate-700 overflow-hidden bg-slate-100 dark:bg-slate-900"
+      className="w-full h-60 rounded-xl border border-slate-300 dark:border-slate-700 overflow-hidden bg-slate-100 dark:bg-slate-900"
     />
   );
 };
@@ -513,7 +513,7 @@ export const ResponderDashboardPage: React.FC = () => {
                       type="button"
                       data-testid={`responder-incident-item-${item.id}`}
                       onClick={() => void handleSelectIncident(item.id)}
-                      className={`w-full text-left rounded-2xl p-4 border-2 transition-colors space-y-2 ${
+                      className={`w-full text-left rounded-xl p-4 border-2 transition-colors space-y-2 ${
                         isSelected
                           ? 'border-teal-700 dark:border-teal-400 bg-teal-50/70 dark:bg-teal-950/40'
                           : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
@@ -545,7 +545,7 @@ export const ResponderDashboardPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-400">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-300">
                         <span>
                           {item.emergency_type ||
                             t('responderDashboard.emergencyTypeUnspecified')}
@@ -584,7 +584,7 @@ export const ResponderDashboardPage: React.FC = () => {
                   <div
                     role="alert"
                     data-testid="responder-duress-banner"
-                    className="rounded-2xl border-2 border-rose-600 bg-rose-50 dark:bg-rose-950/90 p-5 space-y-2"
+                    className="rounded-xl border-2 border-rose-600 bg-rose-50 dark:bg-rose-950/90 p-5 space-y-2"
                   >
                     <div className="flex items-center gap-2 text-rose-900 dark:text-rose-200 font-bold text-base">
                       <ShieldAlert className="w-6 h-6 shrink-0 text-rose-700 dark:text-rose-400" />
@@ -892,7 +892,7 @@ export const ResponderDashboardPage: React.FC = () => {
                     <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
                       <label
                         htmlFor="responder-assign-select-id"
-                        className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400"
+                        className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300"
                       >
                         {t('responderDashboard.assignLabel')}
                       </label>
@@ -966,7 +966,7 @@ export const ResponderDashboardPage: React.FC = () => {
                         <a
                           href={`tel:${selectedDetail.user_phone_e164}`}
                           data-testid="responder-call-user-btn"
-                          className="min-h-[56px] w-full px-5 py-3.5 rounded-2xl font-bold text-base border-2 border-teal-700 text-teal-800 dark:text-teal-300 inline-flex items-center justify-center gap-2"
+                          className="min-h-[56px] w-full px-5 py-3.5 rounded-xl font-bold text-base border-2 border-teal-700 text-teal-800 dark:text-teal-300 inline-flex items-center justify-center gap-2"
                         >
                           <PhoneCall className="w-5 h-5" />
                           {selectedDetail.user_phone_e164}

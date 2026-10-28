@@ -34,8 +34,9 @@ export const LanguageToggle: React.FC = () => {
       <button
         type="button"
         onClick={() => handleSwitch('en')}
+        aria-label={t('app.english')}
         aria-pressed={currentLang === 'en'}
-        className={`min-h-[44px] min-w-[44px] px-3 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
+        className={`min-h-[36px] min-w-[36px] px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
           currentLang === 'en'
             ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
             : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
@@ -46,8 +47,9 @@ export const LanguageToggle: React.FC = () => {
       <button
         type="button"
         onClick={() => handleSwitch('hi')}
+        aria-label={t('app.hindi')}
         aria-pressed={currentLang === 'hi'}
-        className={`min-h-[44px] min-w-[44px] px-3 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
+        className={`min-h-[36px] min-w-[36px] px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
           currentLang === 'hi'
             ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
             : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'

@@ -940,6 +940,7 @@ export interface JourneyDto {
   status: JourneyStatus;
   reminder_sent_at: string | null;
   lapsed_notified_at: string | null;
+  note?: string | null;
 }
 
 export const journeysApi = {
@@ -1255,6 +1256,99 @@ export const demoApi = {
       {
         method: 'POST',
         body: JSON.stringify(payload),
+      },
+      fetchImpl
+    ),
+};
+
+export interface SafetyToolDto {
+  id: string;
+  category: string;
+  title: string;
+  description: string;
+  safe_use_notes: string;
+  legal_note: string;
+  link_url: string | null;
+  link_label: string;
+  last_checked: string;
+  active: boolean;
+  is_affiliate: boolean;
+}
+
+export const safetyToolsApi = {
+  listSafetyTools: (
+    params?: { category?: string; include_inactive?: boolean },
+    fetchImpl?: typeof fetch
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params?.category && params.category !== 'all') {
+      searchParams.set('category', params.category);
+    }
+    if (params?.include_inactive) {
+      searchParams.set('include_inactive', 'true');
+    }
+    const qs = searchParams.toString();
+    return apiRequest<{ safety_tools: SafetyToolDto[] }>(
+      qs ? `/safety-tools?${qs}` : '/safety-tools',
+      { method: 'GET' },
+      fetchImpl
+    );
+  },
+
+  createSafetyTool: (
+    payload: {
+      category: string;
+      title: string;
+      description: string;
+      safe_use_notes: string;
+      legal_note: string;
+      link_url?: string | null;
+      link_label?: string;
+      last_checked?: string;
+      active?: boolean;
+      is_affiliate?: boolean;
+    },
+    fetchImpl?: typeof fetch
+  ) =>
+    apiRequest<{ safety_tool: SafetyToolDto }>(
+      '/admin/safety-tools',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      fetchImpl
+    ),
+
+  updateSafetyTool: (
+    id: string,
+    payload: Partial<{
+      category: string;
+      title: string;
+      description: string;
+      safe_use_notes: string;
+      legal_note: string;
+      link_url: string | null;
+      link_label: string;
+      last_checked: string;
+      active: boolean;
+      is_affiliate: boolean;
+    }>,
+    fetchImpl?: typeof fetch
+  ) =>
+    apiRequest<{ safety_tool: SafetyToolDto }>(
+      `/admin/safety-tools/${encodeURIComponent(id)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+      fetchImpl
+    ),
+
+  deleteSafetyTool: (id: string, fetchImpl?: typeof fetch) =>
+    apiRequest<{ success: boolean; deleted_id: string }>(
+      `/admin/safety-tools/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
       },
       fetchImpl
     ),

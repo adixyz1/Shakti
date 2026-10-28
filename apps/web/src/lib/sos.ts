@@ -7,9 +7,11 @@ import {
   enqueueOfflineAlert,
   type QueuedLocationSample,
 } from './offlineQueue';
+import { useAuthStore } from '../store/authStore';
 
 export interface TriggerSosResult extends CreateIncidentResponse {
   queued_offline?: boolean;
+  is_guest?: boolean;
 }
 
 type SosTriggerListener = (response: TriggerSosResult) => void;
@@ -51,6 +53,7 @@ export function getPracticeModeTarget(): string | null {
  * Phase 5: If the browser is offline or POST /api/incidents fails due to
  * connectivity, stores the alert in Dexie/IndexedDB with its client_request_id
  * so retries never create duplicates.
+ * Guest Mode: If not signed in, make NO POST /api/incidents; trigger device-local SOS.
  */
 export async function triggerSos(
   source: string = 'button',
@@ -58,6 +61,7 @@ export async function triggerSos(
   options?: {
     clientRequestId?: string;
     location?: QueuedLocationSample | null;
+    isGuest?: boolean;
   }
 ): Promise<TriggerSosResult> {
   if (activePracticeTargetSource !== null) {
@@ -96,6 +100,47 @@ export async function triggerSos(
     options?.clientRequestId ||
     `sos_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
   const clientCreatedAt = new Date().toISOString();
+
+  // Guest Mode SOS: no server call
+  const isGuest =
+    options?.isGuest !== undefined
+      ? options.isGuest
+      : useAuthStore.getState().user === null;
+
+  if (isGuest) {
+    const guestResponse: TriggerSosResult = {
+      incident: {
+        id: `guest_${clientRequestId}`,
+        user_id: 'guest',
+        status: 'TRIGGERED',
+        emergency_type: null,
+        client_request_id: clientRequestId,
+        created_at: clientCreatedAt,
+        activated_at: null,
+        closed_at: null,
+        merged_into_id: null,
+        source_trigger: source,
+        is_duress: false,
+        needs_user_action: false,
+        escalation_stage: 0,
+        auto_expire_minutes: 60,
+      },
+      idempotent_replay: false,
+      merged_into_existing: false,
+      notifiable_contacts_count: 0,
+      queued_offline: false,
+      is_guest: true,
+    };
+
+    for (const listener of listeners) {
+      try {
+        listener(guestResponse);
+      } catch {
+        // ignore listener errors
+      }
+    }
+    return guestResponse;
+  }
 
   const isBrowserOffline =
     typeof navigator !== 'undefined' && navigator.onLine === false;

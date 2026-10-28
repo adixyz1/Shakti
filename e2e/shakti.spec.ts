@@ -885,4 +885,50 @@ test('6. Offline: go offline, trigger SOS, see the queued state and the SMS opti
     });
     expect(incidentsRes.incident).toBeNull();
   });
+
+  test('16. Guest Mode: guest, offline, trigger SOS, see SMS panel without server incidents', async ({
+    page,
+    baseURL,
+    context,
+  }) => {
+    // 1. Visit Home directly as a guest (no login)
+    await page.goto(`${baseURL}/home`);
+    await expect(page.getByTestId('sos-hold-button')).toBeVisible();
+
+    // 2. Add an emergency contact locally on this phone
+    await page.getByTestId('add-guest-contact-btn').click();
+    await page.getByTestId('guest-contact-name-input').fill('Maya Sister');
+    await page.getByTestId('guest-contact-phone-input').fill('+919876543210');
+    await page.getByTestId('save-guest-contact-btn').click();
+    await expect(page.getByTestId('guest-contacts-card')).toContainText('Maya Sister');
+
+    // 3. Go offline
+    await context.setOffline(true);
+
+    // 4. Trigger SOS by holding button for 2.1s
+    await holdSosButton(page);
+
+    // 5. Cancel window screen appears
+    await expect(page.getByTestId('cancel-window-screen')).toBeVisible();
+
+    // 6. Wait for countdown to expire into ACTIVE state
+    await expect(page.getByTestId('live-status-screen')).toBeVisible({ timeout: 12000 });
+
+    // 7. See Call 112, Call 181, and the SMS panel
+    const liveScreen = page.getByTestId('live-status-screen');
+    await expect(liveScreen.getByTestId('offline-call-112-btn')).toBeVisible();
+    await expect(liveScreen.getByTestId('offline-call-181-btn')).toBeVisible();
+    await expect(liveScreen.getByTestId('sms-fallback-panel')).toBeVisible();
+    await expect(liveScreen.getByTestId('guest-plain-sms-note')).toBeVisible();
+    await expect(liveScreen.getByTestId('guest-plain-sms-note')).toContainText(
+      "Not signed in. Your phone's SMS app sends this message. Sign in to alert your circle automatically."
+    );
+
+    // 8. Restore online
+    await context.setOffline(false);
+
+    // 9. Mark safe / close alert
+    await liveScreen.getByTestId('im-safe-btn').click();
+    await expect(page.getByTestId('closed-status-screen')).toBeVisible();
+  });
 });

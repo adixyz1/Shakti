@@ -6,6 +6,7 @@ import {
   DEFAULT_ORGANIZATION_ZONE,
   resources,
   responders,
+  safetyTools,
   users,
   type UserRole,
 } from '../db/schema';
@@ -105,6 +106,89 @@ export const PHASE7C_SEED_RESOURCES = [
       'Confidential emotional and trauma counseling service. Placeholder: add your local number.',
     availableHours: 'Mon-Sat 09:00-18:00 (add your local number)',
     active: true,
+  },
+] as const;
+
+export const SAFETY_TOOLS_SEED_ITEMS = [
+  {
+    id: 'tool_personal_alarm_keychain',
+    category: 'personal_alarm_keychain',
+    title: 'Personal Alarm Keychain',
+    description:
+      'A battery-powered sound device attached to keys or bags that emits a high-decibel (120-130 dB) siren when the pull pin or emergency button is triggered.',
+    safeUseNotes:
+      'Keep it easily accessible on the outside of your bag or keys. Test battery health periodically in a sound-muffled area. Do not pull the pin directly next to ears to avoid acoustic harm.',
+    legalNote:
+      'Audible personal alarms are legal in public spaces in India and internationally as non-weapon personal signaling tools.',
+    linkUrl: null,
+    linkLabel: 'Add a trusted seller link',
+    lastChecked: '2026-10-28',
+    active: true,
+    isAffiliate: false,
+  },
+  {
+    id: 'tool_whistle',
+    category: 'whistle',
+    title: 'Safety Whistle',
+    description:
+      'A pealess high-frequency emergency whistle capable of producing sharp sound signals over long distances without moving parts or batteries.',
+    safeUseNotes:
+      'Blow with short, sharp, repeated bursts (such as the standard international distress signal of three blasts). Keep attached to a neck lanyard or bag zipper.',
+    legalNote:
+      'Emergency whistles are universally legal signaling and distress devices across all jurisdictions.',
+    linkUrl: null,
+    linkLabel: 'Add a trusted seller link',
+    lastChecked: '2026-10-28',
+    active: true,
+    isAffiliate: false,
+  },
+  {
+    id: 'tool_torch_keyring',
+    category: 'torch_keyring',
+    title: 'Torch Keyring',
+    description:
+      'A high-lumen miniature LED flashlight that illuminates dark paths and can temporarily disorient an approaching person if aimed at eye level.',
+    safeUseNotes:
+      'Charge or replace batteries regularly. Use momentary-on mode to scan poorly lit routes, stairwells, and doorways.',
+    legalNote:
+      'Standard LED flashlights and torch keyrings are universally legal tools without carrying restrictions.',
+    linkUrl: null,
+    linkLabel: 'Add a trusted seller link',
+    lastChecked: '2026-10-28',
+    active: true,
+    isAffiliate: false,
+  },
+  {
+    id: 'tool_portable_door_alarm',
+    category: 'portable_door_alarm',
+    title: 'Portable Door Alarm',
+    description:
+      'A travel security device placed under or between a closed door and doorframe that sounds a loud siren upon detecting unauthorized door movement.',
+    safeUseNotes:
+      'Deploy on hotel, hostel, or temporary accommodation doors when resting. Test the sensor contact before sleeping.',
+    legalNote:
+      'Portable door alarms are legal security alert devices designed for private rooms and rental dwellings.',
+    linkUrl: null,
+    linkLabel: 'Add a trusted seller link',
+    lastChecked: '2026-10-28',
+    active: true,
+    isAffiliate: false,
+  },
+  {
+    id: 'tool_pepper_spray',
+    category: 'pepper_spray',
+    title: 'Pepper Spray',
+    description:
+      'A handheld pressurized canister containing oleoresin capsicum (OC) spray designed to temporarily irritate eyes and respiratory tract to facilitate escape from immediate physical danger.',
+    safeUseNotes:
+      'Practice deploying the safety catch with your thumb, not index finger. Be aware of wind direction to avoid self-contamination. Spray in short bursts and immediately retreat to a crowded or secure area.',
+    legalNote:
+      'Under Indian law (including Arms Act provisions), pepper spray carried for bona fide self-defence is lawful. However, carriage may be restricted on commercial aircraft, metro transit systems, and sensitive high-security facilities.',
+    linkUrl: null,
+    linkLabel: 'Add a trusted seller link',
+    lastChecked: '2026-10-28',
+    active: true,
+    isAffiliate: false,
   },
 ] as const;
 
@@ -210,6 +294,30 @@ export async function seedDatabase(
     }
   }
 
+  for (const toolItem of SAFETY_TOOLS_SEED_ITEMS) {
+    const existingTool = await db
+      .select()
+      .from(safetyTools)
+      .where(eq(safetyTools.id, toolItem.id))
+      .limit(1);
+
+    if (existingTool.length === 0) {
+      await db.insert(safetyTools).values({
+        id: toolItem.id,
+        category: toolItem.category,
+        title: toolItem.title,
+        description: toolItem.description,
+        safeUseNotes: toolItem.safeUseNotes,
+        legalNote: toolItem.legalNote,
+        linkUrl: toolItem.linkUrl,
+        linkLabel: toolItem.linkLabel,
+        lastChecked: toolItem.lastChecked,
+        active: toolItem.active,
+        isAffiliate: toolItem.isAffiliate,
+      });
+    }
+  }
+
   // Only seed rich demo scenario data when specifically running the demo server/route, not in unit/integration test suites
   const isVitest = Boolean(process.env.VITEST || process.env.NODE_ENV === 'test');
   if (isDemoModeEnabled() && !isVitest) {
@@ -217,6 +325,6 @@ export async function seedDatabase(
   }
 
   logger.info(
-    'Seeded Phase 1 baseline accounts (user, responder, admin), demo user data_processing consent, demo responder profile, and Phase 7C resources directory'
+    'Seeded Phase 1 baseline accounts (user, responder, admin), demo user data_processing consent, demo responder profile, Phase 7C resources directory, and safety tools guide'
   );
 }

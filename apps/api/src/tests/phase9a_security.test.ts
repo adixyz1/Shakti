@@ -138,9 +138,9 @@ export const REGISTERED_ROUTE_ACCESS_TABLE: RouteAuthSpec[] = [
   { method: 'GET', path: '/admin/metrics.csv', accessClass: 'admin' },
 
   // Community Safety Reports & Layer (reportsRouter)
-  { method: 'POST', path: '/reports', accessClass: 'any_user' },
+  { method: 'POST', path: '/reports', accessClass: 'public' },
   { method: 'GET', path: '/reports', accessClass: 'admin' },
-  { method: 'GET', path: '/safety-layer', accessClass: 'any_user' },
+  { method: 'GET', path: '/safety-layer', accessClass: 'public' },
   { method: 'GET', path: '/admin/reports', accessClass: 'admin' },
   { method: 'DELETE', path: '/admin/reports/:id', accessClass: 'admin' },
 
@@ -152,8 +152,17 @@ export const REGISTERED_ROUTE_ACCESS_TABLE: RouteAuthSpec[] = [
   { method: 'PUT', path: '/resources/:id', accessClass: 'admin' },
   { method: 'DELETE', path: '/admin/resources/:id', accessClass: 'admin' },
   { method: 'DELETE', path: '/resources/:id', accessClass: 'admin' },
-  { method: 'GET', path: '/pulse/status', accessClass: 'any_user' },
-  { method: 'POST', path: '/pulse', accessClass: 'any_user' },
+  { method: 'GET', path: '/pulse/status', accessClass: 'public' },
+  { method: 'POST', path: '/pulse', accessClass: 'public' },
+
+  // Safety Tools Guide (safetyToolsRouter)
+  { method: 'GET', path: '/safety-tools', accessClass: 'public' },
+  { method: 'POST', path: '/admin/safety-tools', accessClass: 'admin' },
+  { method: 'POST', path: '/safety-tools', accessClass: 'admin' },
+  { method: 'PUT', path: '/admin/safety-tools/:id', accessClass: 'admin' },
+  { method: 'PUT', path: '/safety-tools/:id', accessClass: 'admin' },
+  { method: 'DELETE', path: '/admin/safety-tools/:id', accessClass: 'admin' },
+  { method: 'DELETE', path: '/safety-tools/:id', accessClass: 'admin' },
 
   // Responder Dashboard & Admin Responder/Audit Management (responderRouter)
   { method: 'GET', path: '/responder/incidents', accessClass: 'responder' },
@@ -268,6 +277,7 @@ describe('Phase 9A: Security Hardening (Safeguards, Auth Sweep, CSRF, Headers/Li
   let ownerJourneyId = '';
   let reportId = '';
   let resourceId = 'res_112_erss';
+  let safetyToolId = 'tool_whistle';
   let invitationToken = '';
   let contactMagicToken = '';
   let seededUsersInProdCount = -1;
@@ -583,6 +593,8 @@ describe('Phase 9A: Security Hardening (Safeguards, Auth Sweep, CSRF, Headers/Li
                 ? reportId
                 : template.includes('/resources/')
                   ? resourceId
+                  : template.includes('/safety-tools/')
+                    ? safetyToolId
                   : template.includes('/admin/responders/')
                     ? responderRowId
                     : ownerIncidentId

@@ -2,14 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import {
-  CheckCircle2,
-  EyeOff,
-  LocateFixed,
-  MapPin,
-  RefreshCw,
-  ShieldCheck,
-} from 'lucide-react';
 import { PageLayout } from '../components/PageLayout';
 import { Button, Card, Spinner } from '../components/ui';
 import {
@@ -183,9 +175,9 @@ export const SafetyReportsPage: React.FC = () => {
         for (const cell of cells) {
           L.circle([cell.lat, cell.lng], {
             radius: 65,
-            color: '#b45309',
-            fillColor: '#f59e0b',
-            fillOpacity: 0.45,
+            color: '#9f1239',
+            fillColor: '#e11d48',
+            fillOpacity: 0.35,
           }).addTo(layerGroupRef.current);
         }
       }
@@ -267,51 +259,69 @@ export const SafetyReportsPage: React.FC = () => {
   return (
     <PageLayout>
       <div
-        className="max-w-3xl mx-auto space-y-8"
+        className="max-w-3xl mx-auto space-y-6 py-2"
         data-testid="safety-reports-page"
       >
-        {/* Header */}
-        <header className="space-y-2">
-          <h1
-            className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white"
-            data-testid="safety-reports-title"
-          >
-            {t('reports.title')}
-          </h1>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
+        {/* Title */}
+        <header className="space-y-1 pb-3 border-b border-line">
+          <div className="flex items-center gap-2">
+            <svg
+              aria-hidden="true"
+              className="w-6 h-6 stroke-ink fill-none stroke-2 shrink-0"
+              strokeLinecap="square"
+              strokeLinejoin="miter"
+              viewBox="0 0 24 24"
+            >
+              <path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7z" />
+              <circle cx="12" cy="9" r="2.5" />
+            </svg>
+            <h1
+              className="text-xl md:text-2xl font-bold text-ink tracking-tight"
+              data-testid="safety-reports-title"
+            >
+              {t('reports.title')}
+            </h1>
+          </div>
+          <p className="text-xs md:text-sm text-muted">
             {t('reports.subtitle')}
           </p>
         </header>
 
-        {/* K-Anonymity Privacy Banner */}
+        {/* K-Anonymity Privacy Banner per Paper Utility */}
         <div
           role="note"
           data-testid="reports-k-anonymity-banner"
-          className="rounded-2xl border-2 border-teal-700/30 bg-teal-50/90 dark:bg-teal-950/40 dark:border-teal-500/40 p-4 flex items-start gap-3 text-teal-950 dark:text-teal-100"
+          className="p-4 bg-surface border border-line rounded-xl flex items-start gap-3"
         >
-          <ShieldCheck
-            className="w-5 h-5 text-teal-700 dark:text-teal-400 shrink-0 mt-0.5"
-            aria-hidden="true"
-          />
-          <p className="text-sm font-semibold leading-relaxed">
+          <svg
+            className="w-5 h-5 stroke-teal-700 fill-none stroke-2 shrink-0 mt-0.5"
+            strokeLinecap="square"
+            strokeLinejoin="miter"
+            viewBox="0 0 24 24"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" x2="12" y1="16" y2="12" />
+            <line x1="12" x2="12.01" y1="8" y2="8" />
+          </svg>
+          <p className="text-xs text-muted leading-relaxed">
             {t('reports.privacyBanner', { k: kThreshold })}
           </p>
         </div>
 
         {/* Quick Report Form */}
-        <Card data-testid="report-submit-card" className="space-y-6">
-          <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">
+        <Card data-testid="report-submit-card" className="space-y-5 border border-line bg-surface">
+          <h2 className="text-base font-bold text-ink border-b border-line pb-2">
             {t('reports.formSectionTitle')}
           </h2>
 
-          <form onSubmit={handleSubmitReport} className="space-y-6">
-            {/* 1. Category Chips (56px targets) */}
-            <div className="space-y-3">
-              <label className="block text-sm font-bold text-slate-900 dark:text-slate-100">
+          <form onSubmit={handleSubmitReport} className="space-y-5">
+            {/* Category Chips */}
+            <div className="space-y-2">
+              <label className="text-xs font-mono uppercase tracking-wider text-ink font-semibold block">
                 {t('reports.categoryLabel')}
               </label>
               <div
-                className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+                className="grid grid-cols-2 sm:grid-cols-3 gap-2"
                 role="group"
                 aria-label={t('reports.categoryLabel')}
               >
@@ -324,10 +334,10 @@ export const SafetyReportsPage: React.FC = () => {
                       data-testid={`report-category-chip-${cat}`}
                       aria-pressed={selected}
                       onClick={() => setCategory(cat)}
-                      className={`min-h-[56px] px-4 py-3 rounded-xl font-bold text-sm border-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
+                      className={`h-11 px-3 border rounded-xl text-xs font-mono transition-none cursor-pointer select-none flex items-center justify-center text-center ${
                         selected
-                          ? 'border-teal-700 bg-teal-700 text-white dark:border-teal-500 dark:bg-teal-600'
-                          : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 text-slate-800 dark:text-slate-200 hover:border-teal-600'
+                          ? 'border-teal-700 bg-teal-700 text-surface font-bold'
+                          : 'border-line bg-paper text-ink hover:bg-surface'
                       }`}
                     >
                       {t(`reports.categories.${cat}`)}
@@ -337,12 +347,12 @@ export const SafetyReportsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 2. Location Selection (Drop Pin on Leaflet Map or Use Current Location ONLY after consent) */}
-            <div className="space-y-3">
-              <label className="block text-sm font-bold text-slate-900 dark:text-slate-100">
+            {/* Location Selection */}
+            <div className="space-y-2 pt-2 border-t border-line">
+              <label className="text-xs font-mono uppercase tracking-wider text-ink font-semibold block">
                 {t('reports.locationSectionTitle')}
               </label>
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-muted">
                 {t('reports.dropPinHint')}
               </p>
 
@@ -350,7 +360,7 @@ export const SafetyReportsPage: React.FC = () => {
                 <div
                   ref={pinMapContainerRef}
                   data-testid="report-pin-leaflet-map"
-                  className="w-full h-56 rounded-xl border border-slate-300 dark:border-slate-700 overflow-hidden bg-slate-100 dark:bg-slate-800"
+                  className="w-full h-56 rounded-xl border border-line overflow-hidden bg-paper"
                 />
               )}
 
@@ -358,7 +368,7 @@ export const SafetyReportsPage: React.FC = () => {
                 <div>
                   <label
                     htmlFor="report-lat-input"
-                    className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1"
+                    className="block text-xs font-mono text-muted mb-1"
                   >
                     Latitude
                   </label>
@@ -372,13 +382,13 @@ export const SafetyReportsPage: React.FC = () => {
                       const val = Number(e.target.value);
                       if (Number.isFinite(val)) setPinLat(round3(val));
                     }}
-                    className="w-full min-h-[56px] px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-mono text-sm"
+                    className="w-full h-11 px-3 rounded-xl border border-line bg-paper text-ink font-mono text-xs tabular-nums focus:outline-none focus:border-teal-700"
                   />
                 </div>
                 <div>
                   <label
                     htmlFor="report-lng-input"
-                    className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1"
+                    className="block text-xs font-mono text-muted mb-1"
                   >
                     Longitude
                   </label>
@@ -392,17 +402,20 @@ export const SafetyReportsPage: React.FC = () => {
                       const val = Number(e.target.value);
                       if (Number.isFinite(val)) setPinLng(round3(val));
                     }}
-                    className="w-full min-h-[56px] px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-mono text-sm"
+                    className="w-full h-11 px-3 rounded-xl border border-line bg-paper text-ink font-mono text-xs tabular-nums focus:outline-none focus:border-teal-700"
                   />
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                 <span
                   data-testid="report-rounded-coords-preview"
-                  className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-teal-800 dark:text-teal-300"
+                  className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-teal-700"
                 >
-                  <MapPin className="w-4 h-4" aria-hidden="true" />
+                  <svg className="w-3.5 h-3.5 stroke-current fill-none stroke-2" strokeLinecap="square" strokeLinejoin="miter" viewBox="0 0 24 24">
+                    <path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7z" />
+                    <circle cx="12" cy="9" r="2.5" />
+                  </svg>
                   {t('reports.selectedGridCoords', {
                     lat: round3(pinLat).toFixed(3),
                     lng: round3(pinLng).toFixed(3),
@@ -415,15 +428,14 @@ export const SafetyReportsPage: React.FC = () => {
                     variant="outline"
                     data-testid="report-use-current-location-btn"
                     onClick={handleUseCurrentLocation}
-                    className="min-h-[56px]"
+                    className="h-10 text-xs"
                   >
-                    <LocateFixed className="w-4 h-4 mr-2" aria-hidden="true" />
                     {t('reports.useCurrentLocationBtn')}
                   </Button>
                 ) : (
                   <p
                     data-testid="report-location-consent-note"
-                    className="text-xs text-slate-500 dark:text-slate-400"
+                    className="text-xs font-mono text-muted"
                   >
                     {t('reports.locationConsentRequiredNote')}
                   </p>
@@ -431,11 +443,11 @@ export const SafetyReportsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 3. Optional Note (max 500 chars) */}
-            <div className="space-y-2">
+            {/* Note */}
+            <div className="space-y-1.5 pt-2 border-t border-line">
               <label
                 htmlFor="report-note-input"
-                className="block text-sm font-bold text-slate-900 dark:text-slate-100"
+                className="text-xs font-mono uppercase tracking-wider text-ink font-semibold block"
               >
                 {t('reports.noteLabel')}
               </label>
@@ -447,18 +459,17 @@ export const SafetyReportsPage: React.FC = () => {
                 value={note}
                 onChange={(e) => setNote(e.target.value.slice(0, 500))}
                 placeholder={t('reports.notePlaceholder')}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
+                className="w-full p-3 rounded-xl border border-line bg-paper text-ink text-xs focus:outline-none focus:border-teal-700"
               />
             </div>
 
-            {/* 4. Anonymous Toggle with Plain Explanation */}
-            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4 space-y-2">
+            {/* Anonymous Toggle */}
+            <div className="p-3 bg-paper border border-line rounded-xl space-y-1.5">
               <div className="flex items-center justify-between gap-4">
                 <label
                   htmlFor="report-anonymous-toggle"
-                  className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 cursor-pointer"
+                  className="text-xs font-mono uppercase tracking-wider text-ink font-bold flex items-center gap-2 cursor-pointer select-none"
                 >
-                  <EyeOff className="w-4 h-4 text-teal-700 dark:text-teal-400" />
                   {t('reports.anonymousToggleLabel')}
                 </label>
                 <input
@@ -467,12 +478,12 @@ export const SafetyReportsPage: React.FC = () => {
                   type="checkbox"
                   checked={anonymous}
                   onChange={(e) => setAnonymous(e.target.checked)}
-                  className="w-6 h-6 accent-teal-700 rounded cursor-pointer"
+                  className="w-5 h-5 accent-teal-700 rounded-xl cursor-pointer"
                 />
               </div>
               <p
                 data-testid="report-anonymous-explanation"
-                className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed"
+                className="text-xs text-muted leading-relaxed"
               >
                 {anonymous
                   ? t('reports.anonymousExplanationOn')
@@ -484,36 +495,36 @@ export const SafetyReportsPage: React.FC = () => {
               <div
                 role="status"
                 data-testid="report-submitted-banner"
-                className="rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-600/40 p-3.5 text-xs font-semibold text-teal-900 dark:text-teal-200 flex items-center gap-2"
+                className="bg-paper border border-teal-700 p-3 text-xs font-mono text-teal-800 flex items-center gap-2 rounded-xl"
               >
-                <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
-                {t('reports.submittedSuccess', {
-                  lat: lastSubmittedReceipt.lat.toFixed(3),
-                  lng: lastSubmittedReceipt.lng.toFixed(3),
-                })}
+                <span className="w-2 h-2 bg-teal-700 rounded-full shrink-0"></span>
+                <span>
+                  {t('reports.submittedSuccess', {
+                    lat: lastSubmittedReceipt.lat.toFixed(3),
+                    lng: lastSubmittedReceipt.lng.toFixed(3),
+                  })}
+                </span>
               </div>
             )}
 
-            <Button
+            <button
               type="submit"
-              variant="primary"
-              fullWidth
               data-testid="report-submit-btn"
               disabled={isSubmitting}
-              className="min-h-[56px] text-base font-bold"
+              className="w-full min-h-[48px] px-4 py-3 bg-teal-700 active:bg-teal-800 text-surface font-mono font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
             >
               {isSubmitting
                 ? t('reports.submittingBtn')
                 : t('reports.submitBtn')}
-            </Button>
+            </button>
           </form>
         </Card>
 
-        {/* Aggregated Safety Layer Section (Never shows individual reports) */}
-        <Card data-testid="safety-layer-section" className="space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Aggregated Safety Layer Section */}
+        <Card data-testid="safety-layer-section" className="space-y-4 border border-line bg-surface">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
             <h2
-              className="text-lg font-extrabold text-slate-900 dark:text-white"
+              className="text-base font-bold text-ink"
               data-testid="safety-layer-heading"
             >
               {t('reports.layerSectionTitle', { k: kThreshold })}
@@ -523,9 +534,8 @@ export const SafetyReportsPage: React.FC = () => {
               variant="outline"
               data-testid="safety-layer-refresh-btn"
               onClick={() => void loadSafetyLayerAndConsent()}
-              className="min-h-[44px]"
+              className="h-9 text-xs"
             >
-              <RefreshCw className="w-4 h-4 mr-1.5" aria-hidden="true" />
               {t('reports.layerRefreshBtn')}
             </Button>
           </div>
@@ -533,7 +543,7 @@ export const SafetyReportsPage: React.FC = () => {
           {!showInteractiveMaps && (
             <p
               data-testid="safety-layer-datasaver-note"
-              className="text-xs font-semibold text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 rounded-xl px-3.5 py-2.5"
+              className="text-xs font-mono text-amber-900 bg-amber-50 border border-amber-300 rounded-xl p-2.5"
             >
               {t('reports.layerDataSaverNote')}
             </p>
@@ -543,25 +553,25 @@ export const SafetyReportsPage: React.FC = () => {
             <div
               ref={layerMapContainerRef}
               data-testid="safety-layer-leaflet-map"
-              className="w-full h-64 rounded-xl border border-slate-300 dark:border-slate-700 overflow-hidden bg-slate-100 dark:bg-slate-800"
+              className="w-full h-64 rounded-xl border border-line overflow-hidden bg-paper"
             />
           )}
 
           {isLoadingLayer ? (
-            <div className="py-8 flex justify-center">
+            <div className="py-8 flex justify-center text-teal-700">
               <Spinner className="w-6 h-6" />
             </div>
           ) : cells.length === 0 ? (
             <p
               data-testid="safety-layer-empty"
-              className="text-sm text-slate-600 dark:text-slate-400 py-4 text-center"
+              className="text-xs font-mono text-muted py-4 text-center"
             >
               {t('reports.layerEmpty', { k: kThreshold })}
             </p>
           ) : (
             <ul
               data-testid="safety-layer-cell-list"
-              className="space-y-3"
+              className="space-y-2"
             >
               {cells.map((cell) => {
                 const summaryParts = Object.entries(cell.categories).map(
@@ -572,16 +582,16 @@ export const SafetyReportsPage: React.FC = () => {
                   <li
                     key={cell.cell_id}
                     data-testid={`safety-layer-cell-${cell.cell_id}`}
-                    className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50 p-4 space-y-1"
+                    className="border border-line bg-paper p-3 rounded-xl space-y-1 font-mono text-xs"
                   >
-                    <p className="font-bold text-sm text-slate-900 dark:text-white">
+                    <p className="font-bold text-ink">
                       {t('reports.cellSummaryTitle', {
                         lat: cell.lat.toFixed(3),
                         lng: cell.lng.toFixed(3),
                         count: cell.total_count,
                       })}
                     </p>
-                    <p className="text-xs text-slate-600 dark:text-slate-300">
+                    <p className="text-muted">
                       {t('reports.cellCategoriesLabel', {
                         summary: summaryParts.join(', '),
                       })}

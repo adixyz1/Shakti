@@ -54,7 +54,7 @@ export const PostIncidentRatingCard: React.FC<PostIncidentRatingCardProps> = ({
   return (
     <Card
       data-testid="post-incident-rating-card"
-      className="p-5 space-y-4 text-left border border-slate-200 dark:border-slate-800"
+      className="p-5 space-y-4 text-left border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-sm"
     >
       <div className="space-y-1">
         <h2
@@ -63,7 +63,7 @@ export const PostIncidentRatingCard: React.FC<PostIncidentRatingCardProps> = ({
         >
           {t('postIncidentRating.prompt')}
         </h2>
-        <p className="text-xs text-slate-600 dark:text-slate-400">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           {t('postIncidentRating.subtitle')}
         </p>
       </div>
@@ -84,8 +84,8 @@ export const PostIncidentRatingCard: React.FC<PostIncidentRatingCardProps> = ({
               onClick={() => setSelectedScore(score)}
               className={`min-h-[48px] rounded-xl font-bold text-base tabular-nums border transition-colors ${
                 isSelected
-                  ? 'bg-teal-800 text-white border-teal-800 dark:bg-teal-600 dark:border-teal-600'
-                  : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  ? 'bg-teal-700 text-white border-teal-700 dark:bg-teal-600 dark:border-teal-600 shadow-sm'
+                  : 'bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
               }`}
             >
               {score}
@@ -112,7 +112,7 @@ export const PostIncidentRatingCard: React.FC<PostIncidentRatingCardProps> = ({
             setSkipped(true);
             onComplete?.();
           }}
-          className="min-h-[44px] px-4 py-2 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap"
+          className="min-h-[48px] px-4 py-2 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap"
         >
           {t('postIncidentRating.skipBtn')}
         </button>
@@ -121,7 +121,7 @@ export const PostIncidentRatingCard: React.FC<PostIncidentRatingCardProps> = ({
           data-testid="post-incident-rating-submit-btn"
           disabled={!selectedScore || isSubmitting}
           onClick={() => void handleSubmit()}
-          className="min-h-[44px] px-5 py-2 rounded-xl text-sm font-semibold bg-teal-800 text-white hover:bg-teal-900 disabled:opacity-50 whitespace-nowrap"
+          className="min-h-[48px] px-5 py-2 rounded-xl text-sm font-semibold bg-teal-700 text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-700 disabled:opacity-50 whitespace-nowrap shadow-sm"
         >
           {t('postIncidentRating.submitBtn')}
         </button>
