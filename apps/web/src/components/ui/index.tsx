@@ -141,7 +141,7 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
     primary:
-      'bg-teal-700 text-surface hover:bg-teal-800 active:bg-teal-800 border border-teal-800 dark:bg-teal-700 dark:hover:bg-teal-800 dark:border-teal-800',
+      'bg-teal-700 text-white hover:bg-teal-800 active:bg-teal-800 border border-teal-800 dark:bg-teal-700 dark:text-white dark:hover:bg-teal-800 dark:border-teal-800',
     secondary:
       'bg-ink text-surface hover:bg-slate-800 active:bg-slate-900 border border-ink dark:bg-night-surface dark:text-night-text dark:border-night-line dark:hover:bg-night',
     outline:
@@ -149,7 +149,7 @@ export const Button: React.FC<ButtonProps> = ({
     ghost:
       'text-ink hover:bg-surface-container border border-transparent active:bg-surface-container-high dark:text-night-text dark:hover:bg-night-surface',
     danger:
-      'bg-crimson-800 text-surface hover:bg-crimson-900 active:bg-crimson-900 border border-crimson-900 dark:bg-crimson-800 dark:hover:bg-crimson-900 dark:border-crimson-900',
+      'bg-crimson-800 text-white hover:bg-crimson-900 active:bg-crimson-900 border border-crimson-900 dark:bg-crimson-800 dark:text-white dark:hover:bg-crimson-900 dark:border-crimson-900',
   };
 
   return (
@@ -176,7 +176,7 @@ export const BigButton: React.FC<ButtonProps> = ({
 }) => {
   const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
     primary:
-      'bg-teal-700 text-surface hover:bg-teal-800 active:bg-teal-800 border border-teal-800 dark:bg-teal-700 dark:hover:bg-teal-800 dark:border-teal-800',
+      'bg-teal-700 text-white hover:bg-teal-800 active:bg-teal-800 border border-teal-800 dark:bg-teal-700 dark:text-white dark:hover:bg-teal-800 dark:border-teal-800',
     secondary:
       'bg-ink text-surface hover:bg-slate-800 active:bg-slate-900 border border-ink dark:bg-night-surface dark:text-night-text dark:border-night-line',
     outline:
@@ -184,7 +184,7 @@ export const BigButton: React.FC<ButtonProps> = ({
     ghost:
       'bg-transparent text-ink hover:bg-surface-container border border-transparent dark:text-night-text dark:hover:bg-night-surface',
     danger:
-      'bg-crimson-800 text-surface hover:bg-crimson-900 active:bg-crimson-900 border border-crimson-900 dark:bg-crimson-800 dark:hover:bg-crimson-900 dark:border-crimson-900',
+      'bg-crimson-800 text-white hover:bg-crimson-900 active:bg-crimson-900 border border-crimson-900 dark:bg-crimson-800 dark:text-white dark:hover:bg-crimson-900 dark:border-crimson-900',
   };
 
   return (

@@ -42,6 +42,21 @@
     --theme-ink: #f8fafc;
     --theme-muted: #cbd5e1;
   }
+  .dark .bg-crimson-800,
+  .dark .bg-crimson-900,
+  .dark .bg-teal-700,
+  .dark .bg-teal-800,
+  .dark .bg-rose-700,
+  .dark .bg-rose-800 {
+    --theme-surface: #ffffff;
+    --color-surface: #ffffff;
+  }
+  .dark .text-teal-700 {
+    color: #2dd4bf;
+  }
+  .dark .text-crimson-800 {
+    color: #fda4af;
+  }
   body {
     @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased selection:bg-teal-600 selection:text-white break-words;
     font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

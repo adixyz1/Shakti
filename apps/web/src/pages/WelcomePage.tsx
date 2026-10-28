@@ -5,6 +5,7 @@ import { Bell } from 'lucide-react';
 import { BigButton, Button, Card } from '../components/ui';
 import { PageLayout } from '../components/PageLayout';
 import { LoudAlarmModal } from '../components/LoudAlarmModal';
+import { PWAInstallButton } from '../components/PWAInstallButton';
 
 export const WelcomePage: React.FC = () => {
   const { t } = useTranslation();
@@ -28,10 +29,14 @@ export const WelcomePage: React.FC = () => {
           <p className="text-sm md:text-base text-muted dark:text-slate-300 leading-relaxed max-w-2xl">
             {t('welcome.subtitle')}
           </p>
-          <div className="pt-2 flex flex-col sm:flex-row gap-3 max-w-md">
+          <div className="pt-2 flex flex-col sm:flex-row flex-wrap gap-3 max-w-xl">
             <BigButton variant="primary" onClick={() => navigate('/login')}>
               {t('welcome.ctaPrimary')}
             </BigButton>
+            <PWAInstallButton
+              variant="hero"
+              testId="welcome-download-apk-btn"
+            />
             <Button
               type="button"
               variant="outline"

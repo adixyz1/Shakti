@@ -164,15 +164,23 @@ export async function validateDatabaseToolLinks(
   return { valid: errors.length === 0, errors };
 }
 
-export async function runChecker(): Promise<boolean> {
-  const targetFile = path.resolve(process.cwd(), 'data/safety-tools.seed.json');
+export async function runChecker(
+  customSeedPath?: string,
+  skipDb: boolean = false
+): Promise<boolean> {
+  const targetFile =
+    customSeedPath || path.resolve(process.cwd(), 'data/safety-tools.seed.json');
   console.log(`[check:tool-links] Verifying seed file: ${targetFile}`);
   const seedResult = validateToolLinks(targetFile);
 
-  console.log('[check:tool-links] Verifying database tool links...');
-  const dbResult = await validateDatabaseToolLinks();
+  let dbErrors: string[] = [];
+  if (!skipDb) {
+    console.log('[check:tool-links] Verifying database tool links...');
+    const dbResult = await validateDatabaseToolLinks();
+    dbErrors = dbResult.errors;
+  }
 
-  const allErrors = [...seedResult.errors, ...dbResult.errors];
+  const allErrors = [...seedResult.errors, ...dbErrors];
   if (allErrors.length > 0) {
     console.error('[check:tool-links] Validation FAILED with errors:');
     allErrors.forEach((e) => console.error(`  - ${e}`));
@@ -185,18 +193,27 @@ export async function runChecker(): Promise<boolean> {
   return true;
 }
 
+export async function runCli(
+  customSeedPath?: string,
+  skipDb: boolean = false
+): Promise<number> {
+  try {
+    const success = await runChecker(customSeedPath, skipDb);
+    const code = success ? 0 : 1;
+    process.exit(code);
+    return code;
+  } catch (err) {
+    console.error('[check:tool-links] Fatal execution error:', err);
+    process.exit(1);
+    return 1;
+  }
+}
+
 const currentFilePath = fileURLToPath(import.meta.url);
 if (
   process.env.VITEST !== 'true' &&
   process.argv[1] &&
   path.resolve(process.argv[1]) === path.resolve(currentFilePath)
 ) {
-  runChecker()
-    .then((success) => {
-      process.exit(success ? 0 : 1);
-    })
-    .catch((err) => {
-      console.error('[check:tool-links] Fatal execution error:', err);
-      process.exit(1);
-    });
+  void runCli();
 }

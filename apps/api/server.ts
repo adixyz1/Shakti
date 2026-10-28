@@ -1,3 +1,4 @@
+import fs from 'fs';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -34,6 +35,21 @@ import {
 } from './src/services/scheduler';
 import { attachWebSocketHub } from './src/services/wsHub';
 
+function resolveLocalApkPath(): string | null {
+  const candidates = [
+    path.join(process.cwd(), 'public', 'shakti.apk'),
+    path.join(process.cwd(), 'public', 'saathi.apk'),
+    path.join(process.cwd(), 'dist', 'shakti.apk'),
+    path.join(process.cwd(), 'dist', 'saathi.apk'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 export function createApp(): Express {
   const app = express();
 
@@ -49,6 +65,79 @@ export function createApp(): Express {
   app.use(express.json({ limit: '64kb' }));
   app.use(cookieParser());
   app.use(csrfProtectionMiddleware);
+
+  // Android TWA Digital Asset Links (/.well-known/assetlinks.json)
+  app.get('/.well-known/assetlinks.json', (_req, res) => {
+    const pkgName =
+      (process.env.ANDROID_TWA_PACKAGE_NAME || '').trim() ||
+      'app.shakti.safety.twa';
+    const fingerprint = (
+      process.env.ANDROID_TWA_SHA256_FINGERPRINT || ''
+    ).trim();
+    if (fingerprint) {
+      res.setHeader('Content-Type', 'application/json');
+      res.status(200).json([
+        {
+          relation: ['delegate_permission/common.handle_all_urls'],
+          target: {
+            namespace: 'android_app',
+            package_name: pkgName,
+            sha256_cert_fingerprints: [fingerprint],
+          },
+        },
+      ]);
+      return;
+    }
+    const staticAssetLinks = path.join(
+      process.cwd(),
+      'public',
+      '.well-known',
+      'assetlinks.json'
+    );
+    if (fs.existsSync(staticAssetLinks)) {
+      res.setHeader('Content-Type', 'application/json');
+      res.sendFile(staticAssetLinks);
+      return;
+    }
+    res.status(200).json([]);
+  });
+
+  // Check if a packaged Android .apk is available for direct download
+  app.get(['/api/apk-status', '/apk-status'], (_req, res) => {
+    const externalUrl = (process.env.VITE_ANDROID_APK_URL || '').trim();
+    const localApk = resolveLocalApkPath();
+    const isExternalHttp = /^https?:\/\//i.test(externalUrl);
+    const available = Boolean(localApk || isExternalHttp);
+    res.status(200).json({
+      available,
+      downloadUrl: isExternalHttp ? externalUrl : '/shakti.apk',
+      filename: 'shakti-android.apk',
+    });
+  });
+
+  // Direct Android .apk file download endpoint
+  app.get(
+    ['/shakti.apk', '/saathi.apk', '/api/download/apk'],
+    (_req, res) => {
+      const localApk = resolveLocalApkPath();
+      if (!localApk) {
+        res.status(404).json({
+          error: {
+            code: 'APK_NOT_UPLOADED',
+            message:
+              'Android APK package has not been placed in public/shakti.apk yet. Generate it via PWABuilder and place shakti.apk in the public/ directory.',
+          },
+        });
+        return;
+      }
+      res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="shakti-android.apk"'
+      );
+      res.sendFile(localApk);
+    }
+  );
 
   // Mount API routes under /api (primary prefix) and root for direct health/auth calls
   app.use('/api', apiRouter);

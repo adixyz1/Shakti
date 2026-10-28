@@ -39,7 +39,7 @@ export const LanguageToggle: React.FC = () => {
         className={`min-h-[36px] min-w-[36px] px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
           currentLang === 'en'
             ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+            : 'text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white'
         }`}
       >
         {t('app.english')}
@@ -52,7 +52,7 @@ export const LanguageToggle: React.FC = () => {
         className={`min-h-[36px] min-w-[36px] px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
           currentLang === 'hi'
             ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+            : 'text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white'
         }`}
       >
         {t('app.hindi')}

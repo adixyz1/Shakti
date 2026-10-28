@@ -1,12 +1,20 @@
-import { describe, it, expect } from 'vitest';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   validateSingleLink,
+  runCli,
   SHORTENER_HOSTS,
   type SafetyToolLinkItem,
 } from '../../../../scripts/check_tool_links';
 
 describe('Safety Tools Link Checker (Pure Unit Tests, No Network)', () => {
   const baseDateMs = new Date('2026-10-28T00:00:00Z').getTime();
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it('1. Accepts a valid HTTPS link checked recently', () => {
     const validLink: SafetyToolLinkItem = {
@@ -99,5 +107,49 @@ describe('Safety Tools Link Checker (Pure Unit Tests, No Network)', () => {
     const res = validateSingleLink(oldLink, new Set(), baseDateMs);
     expect(res.valid).toBe(false);
     expect(res.errors.some((e) => e.includes('older than 90 days'))).toBe(true);
+  });
+
+  it('7. Exits non-zero on any failure', async () => {
+    const exitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((() => undefined) as never);
+
+    const tempFile = path.join(
+      os.tmpdir(),
+      `bad-safety-tools-${Date.now()}.json`
+    );
+    fs.writeFileSync(
+      tempFile,
+      JSON.stringify({
+        categories: [
+          {
+            id: 'cat_whistle',
+            slug: 'whistle',
+            title: 'Whistle',
+            description: 'Desc',
+            safe_use_notes: 'Notes',
+            legal_note: 'Legal',
+            links: [
+              {
+                seller_name: 'Bad HTTP Seller',
+                link_url: 'http://example.com/bad',
+                last_checked: '2026-10-25',
+              },
+            ],
+          },
+        ],
+      }),
+      'utf-8'
+    );
+
+    try {
+      const code = await runCli(tempFile, true);
+      expect(code).not.toBe(0);
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    } finally {
+      if (fs.existsSync(tempFile)) {
+        fs.unlinkSync(tempFile);
+      }
+    }
   });
 });

@@ -7,7 +7,15 @@
       "description": "A compact device that emits an intense 120-130 dB ear-piercing siren upon pulling a pin or pressing a button.",
       "safe_use_notes": "Test batteries monthly in an enclosed muffling cloth to prevent auditory discomfort. Keep the pull pin unobstructed and practice activation with one hand.",
       "legal_note": "Lawful in all public spaces in India and generally unrestricted worldwide. Does not constitute a weapon.",
-      "links": []
+      "links": [
+        {
+          "id": "link_devil_will_alarm_keychain",
+          "seller_name": "Devil Will Emergency Keychain Personal Protection Alarm",
+          "link_url": "https://www.amazon.in/Devil-Will-Emergency-Keychain-Protection/dp/B0BPPZFZJD/ref=mp_s_a_1_9_sspa?dib=eyJ2IjoiMSJ9.AgkpYmaW4M8wZkglFdgjcWWd37kjFeKJ02ObUhz-YuoltfN0EyTfJF07Cn8fSf7_cwTctzZi7_XMdBBboPbjTEsZCWi6rFOkzKQq6MNTNV27QNxObNiEfiBY2Y0SvePDArz6UZvHv45lUYWaT9YCySsbm_JoircgmIB0VWsCdKkKH1VLy3sORph7QvJaxzSxMNbTEuAs5kUHj9LPM2WSSA.-XNM5KroO6JesL_hiNQ3MIr0d20HgKwG724Brso4ZeI&dib_tag=se&keywords=self+defence+tools+for+men&qid=1793179756&sr=8-9-spons&aref=G8bI5MTDeF&sp_csd=d2lkZ2V0TmFtZT1zcF9waG9uZV9zZWFyY2hfbXRm&psc=1&smid=A123OED1AUH9IH",
+          "is_affiliate": false,
+          "last_checked": "2026-10-28"
+        }
+      ]
     },
     {
       "id": "cat_whistle",
@@ -22,10 +30,18 @@
       "id": "cat_torch",
       "slug": "torch_keyring",
       "title": "Torch Keyring",
-      "description": "Ultra-bright compact flashlight with sustained lumen beam and optional high-frequency strobe function.",
-      "safe_use_notes": "Recharge via USB-C or swap coin cells regularly. The strobe mode can briefly disorient an approaching threat in dark stairwells or poorly lit lanes.",
-      "legal_note": "Unrestricted everyday illumination tool with zero carriage constraints.",
-      "links": []
+      "description": "Ultra-bright compact flashlight with sustained lumen beam and optional high-frequency strobe and personal siren function.",
+      "safe_use_notes": "Recharge via USB-C or swap coin cells regularly. The strobe mode and loud siren can disorient an approaching threat in dark stairwells or poorly lit lanes.",
+      "legal_note": "Unrestricted everyday illumination and audible signaling tool with zero carriage constraints.",
+      "links": [
+        {
+          "id": "link_eveready_dl102_rechargeable_personal_alarm",
+          "seller_name": "Eveready DL102 Rechargeable Decibels Personal Safety Alarm & Torch",
+          "link_url": "https://www.amazon.in/Eveready-DL102-Rechargeable-Decibels-Personal/dp/B0D89WZ6N3/ref=sxin_31_pa_sp_phone_search_thematic_sspa?content-id=amzn1.sym.526195bb-f554-43e3-9974-2b6aa831a7a8%3Aamzn1.sym.526195bb-f554-43e3-9974-2b6aa831a7a8&cv_ct_cx=self+defence+tools+for+men&keywords=self+defence+tools+for+men&pd_rd_i=B0D89WZ6N3&pd_rd_r=5bec543d-9d2b-4370-a579-24b96d3ffa56&pd_rd_w=U7EMx&pd_rd_wg=MXs6i&pf_rd_p=526195bb-f554-43e3-9974-2b6aa831a7a8&pf_rd_r=931VB4RH1XWBKPH299TC&qid=1793179756&sr=1-2-66673dcf-083f-43ba-b782-d4a436cc5cfb-spons&aref=Kua9dENCZs&sp_csd=d2lkZ2V0TmFtZT1zcF9waG9uZV9zZWFyY2hfdGhlbWF0aWM&psc=1",
+          "is_affiliate": false,
+          "last_checked": "2026-10-28"
+        }
+      ]
     },
     {
       "id": "cat_door_alarm",
@@ -40,16 +56,54 @@
       "id": "cat_pepper_spray",
       "slug": "pepper_spray",
       "title": "Pepper Spray",
-      "description": "Oleoresin capsicum (OC) canister delivering a targeted spray or stream to cause temporary lacrimation and incapacitation of an attacker.",
+      "description": "Oleoresin capsicum (OC) canister delivering a targeted spray or gel stream to cause temporary lacrimation and incapacitation of an attacker.",
       "safe_use_notes": "Check canister expiration date annually. Hold canister with thumb over trigger for secure grip. Always be mindful of wind direction before spraying.",
       "legal_note": "Rules about carrying pepper spray can differ by place and change over time, so check local regulations before you buy or carry. In India, carriage for lawful self-defense is permitted, but prohibited on flights and inside secured government or transit facilities. Ask a qualified person for legal advice.",
       "links": [
         {
-          "id": "link_example_delete_me",
-          "seller_name": "Example Trusted Seller (example, delete me)",
-          "link_url": "https://example.com/trusted-seller",
+          "id": "link_flipkart_pepper_stream_pack2",
+          "seller_name": "Pepper Spray for Women Safety - Self Defense Spray (55ml each, Pack of 2)",
+          "link_url": "https://dl.flipkart.com/s/gawwSQuuuN",
           "is_affiliate": false,
-          "last_checked": "2026-10-25"
+          "last_checked": "2026-10-28"
+        },
+        {
+          "id": "link_flipkart_impower_black_pepper_gel",
+          "seller_name": "Impower Black Pepper Self-Defence Gel Spray (12 ft Range, Pocket Size)",
+          "link_url": "https://dl.flipkart.com/dl/impower-black-pepper-self-defence-spray-12-ft-range-pocket-size-one-hand-use-gel-spray/p/itm408d2cbcc02ae?pid=PSFEYDVAGWN4TNVG&lid=LSTPSFEYDVAGWN4TNVGLGEBTR&marketplace=FLIPKART&hl_lid=&store=hlc/iwt/mie&ctx=eyJkZWxpdmVyZWRCeSI6IiIsImRpc3BsYXlQcmljZSI6IjE5OSJ9&fm=eyJ3dHAiOiJwcm9kdWN0Q2FyZExpc3QiLCJwcnB0Ijoic3AiLCJtaWQiOiJBRFMifQ&_refId=&_appId=CL",
+          "is_affiliate": false,
+          "last_checked": "2026-10-28"
+        }
+      ]
+    },
+    {
+      "id": "cat_self_defence",
+      "slug": "self_defence",
+      "title": "Self Defence",
+      "description": "Handheld self-defence tools including expandable batons and folding pocket knives intended for emergency personal protection.",
+      "safe_use_notes": "Handle with extreme caution. Keep folded or retracted with safety locks engaged when stored. Never deploy unless facing imminent physical danger, and prioritize escaping to a safe area.",
+      "legal_note": "Carriage of batons and knives in public spaces, transit systems (metro, railways, airports), and educational campuses is strictly regulated under the Indian Arms Act and state police notifications. Verify local blade-length and weapon restrictions before purchasing or carrying.",
+      "links": [
+        {
+          "id": "link_safetygadgets_expandable_baton",
+          "seller_name": "Expandable Self-Defence Baton",
+          "link_url": "https://safetygadgets.in/products/expandable-baton",
+          "is_affiliate": false,
+          "last_checked": "2026-10-28"
+        },
+        {
+          "id": "link_amazon_foldable_stainless_knife",
+          "seller_name": "Foldable Stainless Steel Pocket Knife",
+          "link_url": "https://www.amazon.in/Foldable-Kitchen-Office-Stainless-Vegetable/dp/B0HJHG22QF/ref=mp_s_a_1_17?dib=eyJ2IjoiMSJ9.AgkpYmaW4M8wZkglFdgjcWWd37kjFeKJ02ObUhz-YuoltfN0EyTfJF07Cn8fSf7_cwTctzZi7_XMdBBboPbjTEsZCWi6rFOkzKQq6MNTNV27QNxObNiEfiBY2Y0SvePDArz6UZvHv45lUYWaT9YCySsbm_JoircgmIB0VWsCdKkKH1VLy3sORph7QvJaxzSxMNbTEuAs5kUHj9LPM2WSSA.-XNM5KroO6JesL_hiNQ3MIr0d20HgKwG724Brso4ZeI&dib_tag=se&keywords=self+defence+tools+for+men&qid=1793179756&sr=8-17",
+          "is_affiliate": false,
+          "last_checked": "2026-10-28"
+        },
+        {
+          "id": "link_amazon_pocket_folding_knife_wooden",
+          "seller_name": "Pocket Folding Knife with Wooden Handle",
+          "link_url": "https://www.amazon.in/Pocket-Folding-Knife-Wooden-Handle/dp/B0HJZJHTP6/ref=mp_s_a_1_12?dib=eyJ2IjoiMSJ9.AgkpYmaW4M8wZkglFdgjcWWd37kjFeKJ02ObUhz-YuoltfN0EyTfJF07Cn8fSf7_cwTctzZi7_XMdBBboPbjTEsZCWi6rFOkzKQq6MNTNV27QNxObNiEfiBY2Y0SvePDArz6UZvHv45lUYWaT9YCySsbm_JoircgmIB0VWsCdKkKH1VLy3sORph7QvJaxzSxMNbTEuAs5kUHj9LPM2WSSA.-XNM5KroO6JesL_hiNQ3MIr0d20HgKwG724Brso4ZeI&dib_tag=se&keywords=self+defence+tools+for+men&qid=1793179756&sr=8-12",
+          "is_affiliate": false,
+          "last_checked": "2026-10-28"
         }
       ]
     }

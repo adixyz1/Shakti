@@ -5,6 +5,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import i18n from '../i18n';
 import { SafetyToolsPage, OFFLINE_DEFAULT_SAFETY_TOOLS } from '../pages/SafetyToolsPage';
+import { AdminPage } from '../pages/AdminPage';
 import { ResourcesPage } from '../pages/ResourcesPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { HomePage } from '../pages/HomePage';
@@ -58,40 +59,78 @@ describe('Safety Tools UI & Navigation Suite', () => {
     await i18n.changeLanguage('en');
   });
 
-  it('2. Empty state shown with zero links: calm sentence and disclosure text, nothing else', async () => {
+  it('2. Empty state shown with zero links: calm sentence ("No tools are listed yet.", English and Hindi) and disclosure text, nothing else; admin editor still shows every category with "No links added yet"', async () => {
+    const toolsWithoutLinks = OFFLINE_DEFAULT_SAFETY_TOOLS.map((t) => ({
+      ...t,
+      link_url: null,
+    }));
     // All tools have link_url: null
     vi.spyOn(apiModule.safetyToolsApi, 'listSafetyTools').mockResolvedValue({
-      safety_tools: OFFLINE_DEFAULT_SAFETY_TOOLS,
+      safety_tools: toolsWithoutLinks,
     });
+    vi.spyOn(apiModule.adminAuditApi, 'listAuditLogs').mockResolvedValue({ entries: [] });
+    vi.spyOn(apiModule.adminRespondersApi, 'listResponders').mockResolvedValue({ responders: [] });
+    vi.spyOn(apiModule.resourcesPulseApi, 'listResources').mockResolvedValue({ resources: [] });
 
-    render(
+    const { unmount } = render(
       <MemoryRouter initialEntries={['/safety-tools']}>
         <SafetyToolsPage />
       </MemoryRouter>
     );
 
-    await screen.findByTestId('safety-tools-page');
-
-    // 1. Mandatory disclosure text is present
-    expect(screen.getByTestId('safety-tools-disclosure')).toBeInTheDocument();
-
-    // 2. Calm sentence is shown
-    const emptySentence = screen.getByTestId('safety-tools-empty-sentence');
+    const emptySentence = await screen.findByTestId('safety-tools-empty-sentence');
     expect(emptySentence).toBeInTheDocument();
     expect(emptySentence.textContent?.trim()).toBe('No tools are listed yet.');
 
-    // 3. No category filters or tool cards are shown
+    // Mandatory disclosure text is present
+    expect(screen.getByTestId('safety-tools-disclosure')).toBeInTheDocument();
+
+    // No category filters or tool cards are shown
     expect(screen.queryByTestId('safety-tool-cat-all')).toBeNull();
     expect(screen.queryByTestId('safety-tools-list')).toBeNull();
+
+    unmount();
+
+    // Verify Hindi empty state sentence + disclosure text
+    await i18n.changeLanguage('hi');
+    const { unmount: unmountHi } = render(
+      <MemoryRouter initialEntries={['/safety-tools']}>
+        <SafetyToolsPage />
+      </MemoryRouter>
+    );
+
+    const hiEmptySentence = await screen.findByTestId('safety-tools-empty-sentence');
+    expect(hiEmptySentence.textContent?.trim()).toBe('अभी तक कोई उपकरण सूचीबद्ध नहीं हैं।');
+    expect(screen.getByTestId('safety-tools-disclosure')).toBeInTheDocument();
+    expect(screen.queryByTestId('safety-tools-list')).toBeNull();
+
+    unmountHi();
+    await i18n.changeLanguage('en');
+
+    // Admin editor still shows every category with "No links added yet"
+    render(
+      <MemoryRouter initialEntries={['/admin/tools']}>
+        <AdminPage />
+      </MemoryRouter>
+    );
+
+    const adminList = await screen.findByTestId('admin-safety-tools-list');
+    expect(adminList.textContent).toContain('Personal Alarm Keychain');
+    expect(adminList.textContent).toContain('Whistle');
+    expect(adminList.textContent).toContain('Torch Keyring');
+    expect(adminList.textContent).toContain('Portable Door Alarm');
+    expect(adminList.textContent).toContain('Pepper Spray');
+    expect(adminList.textContent).toContain('Self Defence');
+    expect(adminList.textContent).toContain('No links added yet');
   });
 
-  it('3. Category with one link appears and others stay hidden; rel="noopener noreferrer" and affiliate notice logic', async () => {
+  it('3. Category with one link appears while others stay hidden; link has target="_blank" and rel="noopener noreferrer"; affiliate notice appears only for flagged links', async () => {
     const mockTools: apiModule.SafetyToolDto[] = [
-      ...OFFLINE_DEFAULT_SAFETY_TOOLS, // 5 seeded items with link_url: null
+      ...OFFLINE_DEFAULT_SAFETY_TOOLS.map((t) => ({ ...t, link_url: null })),
       {
-        id: 'tool_whistle_link',
+        id: 'tool_whistle_affiliate',
         category: 'whistle',
-        title: 'Lanyard Safety Whistle',
+        title: 'Lanyard Safety Whistle (Affiliate)',
         description: 'Standard orange safety whistle.',
         safe_use_notes: 'Blow 3 short bursts.',
         legal_note: 'Universally legal.',
@@ -100,6 +139,19 @@ describe('Safety Tools UI & Navigation Suite', () => {
         last_checked: '2026-10-28',
         active: true,
         is_affiliate: true,
+      },
+      {
+        id: 'tool_whistle_non_affiliate',
+        category: 'whistle',
+        title: 'Pealess Whistle (Non-Affiliate)',
+        description: 'High-decibel pealess whistle.',
+        safe_use_notes: 'Attach to lanyard.',
+        legal_note: 'Universally legal.',
+        link_url: 'https://example.org/whistle-direct',
+        link_label: 'View direct link',
+        last_checked: '2026-10-28',
+        active: true,
+        is_affiliate: false,
       },
     ];
 
@@ -113,28 +165,36 @@ describe('Safety Tools UI & Navigation Suite', () => {
       </MemoryRouter>
     );
 
-    await screen.findByTestId('safety-tools-page');
+    await screen.findByTestId('safety-tool-card-tool_whistle_affiliate');
 
-    // 1. Category with a link (whistle) appears
-    expect(screen.getByTestId('safety-tool-card-tool_whistle_link')).toBeInTheDocument();
+    // 1. Category with active link (whistle) appears
+    expect(screen.getByTestId('safety-tool-card-tool_whistle_affiliate')).toBeInTheDocument();
+    expect(screen.getByTestId('safety-tool-card-tool_whistle_non_affiliate')).toBeInTheDocument();
 
-    // 2. Other categories with no links (personal alarm, pepper spray, etc.) stay hidden
-    expect(screen.queryByTestId('safety-tool-card-tool_personal_alarm')).toBeNull();
+    // 2. Other categories with no links stay completely hidden
+    expect(screen.queryByTestId('safety-tool-card-tool_personal_alarm_keychain')).toBeNull();
     expect(screen.queryByTestId('safety-tool-card-tool_pepper_spray')).toBeNull();
-    expect(screen.queryByTestId('safety-tool-card-tool_torch')).toBeNull();
-    expect(screen.queryByTestId('safety-tool-card-tool_door_alarm')).toBeNull();
+    expect(screen.queryByTestId('safety-tool-card-tool_torch_keyring')).toBeNull();
+    expect(screen.queryByTestId('safety-tool-card-tool_portable_door_alarm')).toBeNull();
+    expect(screen.queryByTestId('safety-tool-cat-personal_alarm_keychain')).toBeNull();
+    expect(screen.queryByTestId('safety-tool-cat-pepper_spray')).toBeNull();
+    expect(screen.queryByTestId('safety-tool-cat-torch_keyring')).toBeNull();
+    expect(screen.queryByTestId('safety-tool-cat-portable_door_alarm')).toBeNull();
 
     // 3. The link has target="_blank" and rel="noopener noreferrer"
-    const linkEl = screen.getByTestId('safety-tool-link-tool_whistle_link');
+    const linkEl = screen.getByTestId('safety-tool-link-tool_whistle_affiliate');
     expect(linkEl).toBeInTheDocument();
     expect(linkEl).toHaveAttribute('href', 'https://example.org/whistle-supplier');
     expect(linkEl).toHaveAttribute('target', '_blank');
     expect(linkEl).toHaveAttribute('rel', 'noopener noreferrer');
 
-    // 4. Affiliate notice appears for flagged link
-    const affiliateBadge = screen.getByTestId('safety-tool-affiliate-badge-tool_whistle_link');
+    // 4. Affiliate notice appears ONLY for flagged links (is_affiliate: true) and NOT for unflagged links (is_affiliate: false)
+    const affiliateBadge = screen.getByTestId('safety-tool-affiliate-badge-tool_whistle_affiliate');
     expect(affiliateBadge).toBeInTheDocument();
     expect(affiliateBadge.textContent).toContain('We may earn a commission');
+    expect(
+      screen.queryByTestId('safety-tool-affiliate-badge-tool_whistle_non_affiliate')
+    ).toBeNull();
   });
 
   it('4. Reachable from Resources and Settings pages only', async () => {

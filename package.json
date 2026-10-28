@@ -17,9 +17,13 @@
     "test:api": "vitest run apps/api/src/tests",
     "test:web": "vitest run apps/web/src/tests",
     "check:tool-links": "tsx scripts/check_tool_links.ts",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:open": "npx cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
     "@google/genai": "^2.4.0",
     "@libsql/client": "^0.17.2",
     "@tailwindcss/vite": "^4.3.3",
@@ -48,6 +52,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
+    "@capacitor/cli": "^8.5.3",
     "@playwright/test": "^1.64.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",

@@ -439,7 +439,20 @@
     "lowPowerToggleLabel": "लो-बैटरी / डेटा-सेवर मोड सक्षम करें",
     "lowBatterySuggestion": "बैटरी कम है ({{percent}}%)। आपातकाल में बिजली बचाने के लिए लो-बैटरी मोड चालू करें।",
     "enableLowPowerBtn": "लो-बैटरी मोड चालू करें",
-    "installAppBtn": "ऐप इंस्टॉल करें",
+    "installAppBtn": "ऐप डाउनलोड (.apk)",
+    "downloadApkBtn": "Android ऐप डाउनलोड करें (.apk)",
+    "androidModalTitle": "Android के लिए शक्ति (SHAKTI) डाउनलोड करें (.apk)",
+    "androidModalSubtitle": "तुरंत SOS और ऑफ़लाइन SMS सुविधा के लिए अपने Android फ़ोन पर शक्ति (SHAKTI) इंस्टॉल करें।",
+    "apkDirectDownloadBtn": "shakti-android.apk डाउनलोड करें",
+    "apkDirectInstallSteps": "डाउनलोड करने के बाद, अपने Android फ़ोन पर shakti-android.apk खोलें और पूछे जाने पर इंस्टॉल की अनुमति दें।",
+    "pwaInstantInstallBtn": "सीधे होम स्क्रीन पर इंस्टॉल करें (APK की आवश्यकता नहीं)",
+    "pwaBuilderTitle": "PWABuilder से .apk तैयार या अपडेट करें",
+    "pwaBuilderStep1": "1. नीचे दिए गए बटन से PWABuilder खोलें और 'Package for Stores' → 'Android' → 'Download Package' चुनें।",
+    "pwaBuilderStep2": "2. डाउनलोड की गई ZIP फ़ाइल को खोलें, .apk फ़ाइल का नाम बदलकर shakti.apk रखें और उसे public/ फ़ोल्डर (public/shakti.apk) में रखें।",
+    "pwaBuilderStep3": "3. public/shakti.apk जोड़ने के बाद ऊपर दिया गया डाउनलोड बटन सीधे shakti-android.apk डाउनलोड करेगा।",
+    "openPwaBuilderBtn": ".apk बनाने के लिए PWABuilder खोलें",
+    "apkNotUploadedNotice": "1-क्लिक डाउनलोड सक्षम करने के लिए तैयार की गई shakti.apk फ़ाइल (GitHub Actions या Android Studio से) को public/shakti.apk में रखें।",
+    "androidChromeManualNote": "Android Chrome पर: आप ब्राउज़र मेनू (⋮) दबाकर 'Install app' या 'Add to Home screen' भी चुन सकते हैं।",
     "iosInstallTitle": "iOS पर शक्ति (SHAKTI) इंस्टॉल करें",
     "iosInstallBody": "सफारी में शेयर बटन दबाएं, फिर ऑफ़लाइन उपयोग के लिए 'होम स्क्रीन में जोड़ें' चुनें।"
   },
@@ -949,7 +962,8 @@
       "whistle": "सीटी",
       "torch_keyring": "टॉर्च कीरिंग",
       "portable_door_alarm": "पोर्टेबल दरवाजा अलार्म",
-      "pepper_spray": "मिर्च स्प्रे"
+      "pepper_spray": "मिर्च स्प्रे",
+      "self_defence": "आत्मरक्षा (Self Defence)"
     },
     "backToResources": "संसाधनों पर वापस जाएं",
     "admin": {

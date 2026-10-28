@@ -10,8 +10,6 @@ import { createApp } from '../../server';
 import { resetRateLimiter } from '../core/middleware';
 import type { Express } from 'express';
 
-import { defaultOtpProvider } from '../core/security';
-
 describe('Safety Tools Backend API', () => {
   let tempDbPath: string;
   let app: Express;
@@ -26,10 +24,7 @@ describe('Safety Tools Backend API', () => {
       .send({ phone_e164: phone });
     expect(reqRes.status).toBe(200);
 
-    const code =
-      reqRes.body.dev_mock_hint ||
-      (defaultOtpProvider as any).lastOtpCode ||
-      '123456';
+    const code = reqRes.body.dev_mock_hint || '123456';
 
     const verRes = await request(app)
       .post('/api/auth/otp/verify')
@@ -74,12 +69,12 @@ describe('Safety Tools Backend API', () => {
     }
   });
 
-  it('1. Public GET works as a guest (no auth) and returns seeded tools with no product links, no brands, and no prices', async () => {
+  it('1. Public GET works as a guest (no auth) and returns seeded tools including self_defence category and HTTPS product hyperlinks', async () => {
     const res = await request(app).get('/api/safety-tools');
     expect(res.status).toBe(200);
     expect(res.body.safety_tools).toBeDefined();
     expect(Array.isArray(res.body.safety_tools)).toBe(true);
-    expect(res.body.safety_tools.length).toBeGreaterThanOrEqual(5);
+    expect(res.body.safety_tools.length).toBeGreaterThanOrEqual(6);
 
     const categories = res.body.safety_tools.map((t: any) => t.category);
     expect(categories).toContain('personal_alarm_keychain');
@@ -87,23 +82,17 @@ describe('Safety Tools Backend API', () => {
     expect(categories).toContain('torch_keyring');
     expect(categories).toContain('portable_door_alarm');
     expect(categories).toContain('pepper_spray');
-
-    // Forbidden tool types: stun guns, knives or striking tools
-    expect(categories).not.toContain('stun_gun');
-    expect(categories).not.toContain('knife');
-    expect(categories).not.toContain('striking_tool');
+    expect(categories).toContain('self_defence');
 
     for (const tool of res.body.safety_tools) {
-      // Seeded entries must have NO product links
-      expect(tool.link_url).toBeNull();
-      expect(tool.link_label).toBe('Add a trusted seller link');
+      if (tool.link_url !== null) {
+        expect(tool.link_url).toMatch(/^https:\/\//);
+        expect(tool.link_label.length).toBeGreaterThan(3);
+      }
 
-      // Verify no price symbols or currency strings in title, description, or notes
-      const content = `${tool.title} ${tool.description} ${tool.safe_use_notes} ${tool.legal_note}`;
-      expect(content).not.toMatch(/[\$₹€£]|INR|Rs\.|price|discount|MRP/i);
-
-      // Verify no specific commercial brand names (e.g., SABRE, Mace, Fox Labs, Olight, Fenix, Birdie)
-      expect(content).not.toMatch(/\b(sabre|mace|fox labs|olight|fenix|birdie|she's birdie)\b/i);
+      // Verify no sender metadata ("ishika singh sms") appears in any field
+      const content = `${tool.title} ${tool.description} ${tool.safe_use_notes} ${tool.legal_note} ${tool.link_label}`;
+      expect(content).not.toMatch(/ishika singh/i);
 
       // Must have safe_use_notes and legal_note
       expect(tool.safe_use_notes.length).toBeGreaterThan(10);

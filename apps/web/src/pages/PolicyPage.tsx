@@ -100,10 +100,10 @@ export const PolicyPage: React.FC = () => {
         </Card>
 
         {/* Section 5: What SAATHI Never Does */}
-        <Card className="space-y-3 border-2 border-crimson-800 bg-paper rounded-2xl" data-testid="policy-section-never">
-          <div className="flex items-center gap-2 border-b border-crimson-800/30 pb-2">
-            <span className="w-2 h-2 bg-crimson-800 rounded-full shrink-0" />
-            <h2 className="text-sm font-mono uppercase tracking-wider font-bold text-crimson-800">
+        <Card className="space-y-3 border-2 border-crimson-800 dark:border-rose-400 bg-paper rounded-2xl" data-testid="policy-section-never">
+          <div className="flex items-center gap-2 border-b border-crimson-800/30 dark:border-rose-400/30 pb-2">
+            <span className="w-2 h-2 bg-crimson-800 dark:bg-rose-400 rounded-full shrink-0" />
+            <h2 className="text-sm font-mono uppercase tracking-wider font-bold text-crimson-800 dark:text-rose-300">
               {t('policy.section5Title')}
             </h2>
           </div>

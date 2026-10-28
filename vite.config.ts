@@ -16,13 +16,19 @@ export default defineConfig(() => {
         includeAssets: [
           'icon.svg',
           'manifest.webmanifest',
+          '.well-known/assetlinks.json',
           'icons/icon-192x192.png',
           'icons/icon-512x512.png',
         ],
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,json,webmanifest,woff2}'],
           navigateFallback: '/index.html',
-          navigateFallbackDenylist: [/^\/api\//, /^\/ws\//],
+          navigateFallbackDenylist: [
+            /^\/api\//,
+            /^\/ws\//,
+            /^\/\.well-known\//,
+            /\.apk$/i,
+          ],
           runtimeCaching: [
             {
               urlPattern: ({ request, url }) =>
@@ -60,7 +66,7 @@ export default defineConfig(() => {
     test: {
       environment: 'jsdom',
       globals: true,
-      exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
+      exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**', '**/android/**'],
     },
   };
 });

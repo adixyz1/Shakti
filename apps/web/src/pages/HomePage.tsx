@@ -2035,17 +2035,17 @@ export const HomePage: React.FC = () => {
                     cancelHoldEarly();
                   }
                 }}
-                className="relative w-full min-h-[72px] h-[72px] bg-crimson-800 text-surface rounded-2xl border border-crimson-900 select-none overflow-hidden flex flex-col items-center justify-center cursor-pointer active:bg-crimson-900 shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 transition-transform active:scale-[0.99]"
+                className="relative w-full min-h-[72px] h-[72px] bg-crimson-800 text-white rounded-2xl border border-crimson-900 select-none overflow-hidden flex flex-col items-center justify-center cursor-pointer active:bg-crimson-900 shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 transition-transform active:scale-[0.99]"
               >
                 <div
                   className="absolute left-0 top-0 bottom-0 bg-crimson-900 transition-none pointer-events-none"
                   style={{ width: `${holdProgress}%` }}
                 />
                 <div className="relative z-10 flex flex-col items-center justify-center text-center px-4">
-                  <span className="text-xl font-bold tracking-wide uppercase text-surface">
+                  <span className="text-xl font-bold tracking-wide uppercase text-white">
                     {t('sos.buttonLabel')}
                   </span>
-                  <span className="text-xs text-surface/90 font-mono tabular-nums">
+                  <span className="text-xs text-white/95 font-mono tabular-nums">
                     {isHolding
                       ? t('sos.holdingProgress', { percent: holdProgress })
                       : '2s hold'}

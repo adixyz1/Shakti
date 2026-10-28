@@ -56,6 +56,7 @@ const SAFETY_TOOL_CATEGORY_OPTIONS = [
   'torch_keyring',
   'portable_door_alarm',
   'pepper_spray',
+  'self_defence',
 ] as const;
 
 export const AdminPage: React.FC = () => {
@@ -1596,59 +1597,98 @@ export const AdminPage: React.FC = () => {
                   className="divide-y divide-slate-200 dark:divide-slate-800 text-left"
                   data-testid="admin-safety-tools-list"
                 >
-                  {safetyTools.map((tool) => (
-                    <div
-                      key={tool.id}
-                      data-testid={`admin-tool-row-${tool.id}`}
-                      className="py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-                    >
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                            {tool.title}
-                          </p>
-                          {tool.is_affiliate && (
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                              Affiliate
-                            </span>
-                          )}
-                          {!tool.active && (
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-400">
-                              Inactive
-                            </span>
-                          )}
+                  {SAFETY_TOOL_CATEGORY_OPTIONS.map((cat) => {
+                    const catTools = safetyTools.filter(
+                      (tItem) => tItem.category.toLowerCase() === cat
+                    );
+                    if (catTools.length === 0) {
+                      return (
+                        <div
+                          key={cat}
+                          data-testid={`admin-tool-category-${cat}`}
+                          className="py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                        >
+                          <div className="space-y-0.5">
+                            <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                              {t(`safetyTools.categories.${cat}`, {
+                                defaultValue: cat,
+                              })}
+                            </p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">
+                              {t(`safetyTools.categories.${cat}`, {
+                                defaultValue: cat,
+                              })}{' '}
+                              · {t('safetyTools.noLinksAddedYet')}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">
-                          {t(`safetyTools.categories.${tool.category}`, {
-                            defaultValue: tool.category,
-                          })}{' '}
-                          · Last checked: {tool.last_checked}
-                          {tool.link_url ? ` · ${tool.link_url}` : ` · ${t('safetyTools.noLinksAddedYet')}`}
-                        </p>
-                      </div>
+                      );
+                    }
+                    return catTools.map((tool) => (
+                      <div
+                        key={tool.id}
+                        data-testid={`admin-tool-row-${tool.id}`}
+                        className="py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                      >
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                              {tool.title}
+                            </p>
+                            {tool.is_affiliate && (
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                                Affiliate
+                              </span>
+                            )}
+                            {!tool.active && (
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                                Inactive
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-400">
+                            {t(`safetyTools.categories.${tool.category}`, {
+                              defaultValue: tool.category,
+                            })}{' '}
+                            · Last checked: {tool.last_checked} ·{' '}
+                            {tool.link_url ? (
+                              <a
+                                href={tool.link_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline font-medium text-teal-700 dark:text-teal-400"
+                              >
+                                {tool.link_label || tool.title}
+                              </a>
+                            ) : (
+                              t('safetyTools.noLinksAddedYet')
+                            )}
+                          </p>
+                        </div>
 
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          data-testid={`admin-edit-tool-${tool.id}`}
-                          onClick={() => handleEditToolClick(tool)}
-                          className="min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-300 dark:border-slate-700 inline-flex items-center gap-1"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                          {t('safetyTools.admin.editToolBtn')}
-                        </button>
-                        <button
-                          type="button"
-                          data-testid={`admin-delete-tool-${tool.id}`}
-                          onClick={() => void handleDeleteSafetyTool(tool.id)}
-                          className="min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold border border-rose-300 text-rose-700 inline-flex items-center gap-1"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          {t('safetyTools.admin.deleteToolBtn')}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            data-testid={`admin-edit-tool-${tool.id}`}
+                            onClick={() => handleEditToolClick(tool)}
+                            className="min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-300 dark:border-slate-700 inline-flex items-center gap-1"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            {t('safetyTools.admin.editToolBtn')}
+                          </button>
+                          <button
+                            type="button"
+                            data-testid={`admin-delete-tool-${tool.id}`}
+                            onClick={() => void handleDeleteSafetyTool(tool.id)}
+                            className="min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-semibold border border-rose-300 text-rose-700 inline-flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            {t('safetyTools.admin.deleteToolBtn')}
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ));
+                  })}
                 </div>
               )}
             </Card>

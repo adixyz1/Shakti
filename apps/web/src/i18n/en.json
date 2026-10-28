@@ -439,7 +439,20 @@
     "lowPowerToggleLabel": "Enable Low-Battery / Data-Saver Mode",
     "lowBatterySuggestion": "Battery is low ({{percent}}%). Turn on Low-Battery Mode to conserve power during an emergency.",
     "enableLowPowerBtn": "Turn On Low-Battery Mode",
-    "installAppBtn": "Install App",
+    "installAppBtn": "Download App (.apk)",
+    "downloadApkBtn": "Download Android App (.apk)",
+    "androidModalTitle": "Download SHAKTI for Android (.apk)",
+    "androidModalSubtitle": "Install SHAKTI on your Android phone for instant 1-tap SOS access and offline SMS fallback.",
+    "apkDirectDownloadBtn": "Download shakti-android.apk",
+    "apkDirectInstallSteps": "After downloading, open shakti-android.apk on your Android phone and allow 'Install unknown apps' if prompted.",
+    "pwaInstantInstallBtn": "Install Instantly to Home Screen (No APK Needed)",
+    "pwaBuilderTitle": "Generate or Update the .apk via PWABuilder",
+    "pwaBuilderStep1": "1. Open PWABuilder with your live app URL below and click 'Package for Stores' → 'Android' → 'Download Package'.",
+    "pwaBuilderStep2": "2. Extract the downloaded ZIP, rename the signed .apk file to shakti.apk, and place it in the public/ folder (public/shakti.apk).",
+    "pwaBuilderStep3": "3. Once public/shakti.apk is added, the Download button above automatically serves shakti-android.apk directly.",
+    "openPwaBuilderBtn": "Open in PWABuilder to Generate .apk",
+    "apkNotUploadedNotice": "Place the compiled shakti.apk (from the GitHub Actions 'Build Android APK' workflow or Android Studio) into public/shakti.apk to enable 1-click APK download.",
+    "androidChromeManualNote": "On Android Chrome: you can also tap the browser menu (⋮) and choose 'Install app' or 'Add to Home screen'.",
     "iosInstallTitle": "Install SHAKTI on iOS",
     "iosInstallBody": "Tap the Share button in Safari, then choose 'Add to Home Screen' so SHAKTI works offline."
   },
@@ -949,7 +962,8 @@
       "whistle": "Whistle",
       "torch_keyring": "Torch Keyring",
       "portable_door_alarm": "Portable Door Alarm",
-      "pepper_spray": "Pepper Spray"
+      "pepper_spray": "Pepper Spray",
+      "self_defence": "Self Defence"
     },
     "backToResources": "Back to Resources",
     "admin": {
