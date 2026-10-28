@@ -38,7 +38,7 @@ jobs:
           sdkmanager --install "platform-tools" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0" "build-tools;36.0.0"
 
       - name: Install npm dependencies
-        run: npm ci
+        run: npm install --legacy-peer-deps
 
       - name: Build production web bundle (dist/) and sync Capacitor Android
         run: |

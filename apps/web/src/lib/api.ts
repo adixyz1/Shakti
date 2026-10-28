@@ -1,4 +1,8 @@
 import { UserProfile } from '../store/authStore';
+import {
+  handleStandaloneApkApiRequest,
+  isStandaloneAndroidApk,
+} from './standaloneApkApi';
 
 const API_BASE =
   (import.meta as unknown as { env?: Record<string, string> }).env
@@ -43,6 +47,10 @@ export async function apiRequest<T>(
   options: RequestInit = {},
   fetchImpl: typeof fetch = fetch
 ): Promise<T> {
+  if (isStandaloneAndroidApk()) {
+    return handleStandaloneApkApiRequest<T>(path, options);
+  }
+
   const url = `${API_BASE}${path}`;
   const config: RequestInit = {
     ...options,

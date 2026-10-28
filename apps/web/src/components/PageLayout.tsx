@@ -15,6 +15,7 @@ import {
 } from '../lib/offlineQueue';
 import { PWAInstallButton } from './PWAInstallButton';
 import { DemoModeBanner } from './DemoModeBanner';
+import { isStandaloneAndroidApk } from '../lib/standaloneApkApi';
 
 const TRIPLE_TAP_WINDOW_MS = 1000;
 
@@ -24,6 +25,7 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
   const location = useLocation();
   const { user, setUser, darkMode, toggleDarkMode } = useAuthStore();
   const { tripleTapEnabled, tripleTapZone } = useTriggerSettingsStore();
+  const isApk = isStandaloneAndroidApk();
 
   const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine !== false : true
@@ -101,9 +103,9 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       </a>
       <DemoModeBanner />
       {/* Strict 3-Zone Top Bar Contract */}
-      <header className="sticky top-0 z-30 h-16 px-4 md:px-6 lg:px-8 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-30 h-16 px-3 sm:px-4 md:px-6 lg:px-8 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md flex items-center justify-between gap-2 sm:gap-4">
         {/* Left Section: Brand Logo + Primary Nav */}
-        <div className="flex items-center gap-4 lg:gap-6 min-w-0 flex-1">
+        <div className="flex items-center gap-2 sm:gap-4 lg:gap-6 min-w-0 flex-1">
           {/* Zone 1: Single text element Brand wordmark (also default triple-tap zone) */}
           <Link
             to={user ? '/home' : '/'}
@@ -116,7 +118,7 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                 }
               }
             }}
-            className="shrink-0 whitespace-nowrap min-h-[44px] inline-flex items-center text-lg sm:text-xl font-bold tracking-tight text-teal-800 dark:text-teal-400 hover:text-teal-900 dark:hover:text-teal-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded-lg px-2 select-none transition-colors"
+            className="shrink-0 whitespace-nowrap min-h-[44px] inline-flex items-center text-base sm:text-xl font-bold tracking-tight text-teal-800 dark:text-teal-400 hover:text-teal-900 dark:hover:text-teal-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded-lg px-1.5 sm:px-2 select-none transition-colors"
           >
             {t('app.name')}
           </Link>
@@ -233,7 +235,7 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         </div>
 
         {/* Zone 3: Primary controls + Persistent Connectivity Indicator + PWA Install */}
-        <div className="shrink-0 flex items-center gap-2">
+        <div className="shrink-0 flex items-center gap-1.5 sm:gap-2">
           {/* Connectivity indicator (only shows warning when offline, sr-only when online) */}
           <span
             role="status"
@@ -241,7 +243,7 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             className={
               isOnline
                 ? 'sr-only'
-                : 'inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md text-amber-900 bg-amber-100 dark:bg-amber-950 dark:text-amber-200'
+                : 'inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md text-amber-900 bg-amber-100 dark:bg-amber-950 dark:text-amber-200'
             }
           >
             {isOnline ? (
@@ -263,14 +265,16 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
           >
             {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
-          {user ? (
-            <Button variant="outline" onClick={handleLogout}>
-              {t('nav.signOut')}
-            </Button>
-          ) : (
-            <Button variant="primary" onClick={() => navigate('/login')}>
-              {t('nav.signIn')}
-            </Button>
+          {!isApk && (
+            user ? (
+              <Button variant="outline" onClick={handleLogout}>
+                {t('nav.signOut')}
+              </Button>
+            ) : (
+              <Button variant="primary" onClick={() => navigate('/login')}>
+                {t('nav.signIn')}
+              </Button>
+            )
           )}
         </div>
       </header>
