@@ -1,11 +1,11 @@
-# Multi-stage Dockerfile for SHAKTI MVP
-# Stage 1: Build frontend assets
+# Multi-stage Dockerfile for SHAKTI MVP (Render, Railway, Fly.io & Oracle Cloud ARM64/AMD64)
+# Stage 1: Install dependencies & build frontend assets
 FROM node:22-slim AS builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json package-lock.json .npmrc ./
+RUN npm install --legacy-peer-deps
 
 COPY tsconfig.json vite.config.ts index.html ./
 COPY public ./public
@@ -14,12 +14,13 @@ COPY apps ./apps
 
 RUN npm run build
 
-# Stage 2: Production runner with glibc (node:22-slim, supports linux/arm64 & linux/amd64) and non-root user
+# Stage 2: Runtime runner with glibc (node:22-slim) and non-root user
 FROM node:22-slim AS runner
 
 WORKDIR /app
 
-ENV NODE_ENV=production
+# Default to staging so DEMO_MODE=true is permitted out-of-the-box while SERVE_STATIC=true serves dist/
+ENV NODE_ENV=staging
 ENV SERVE_STATIC=true
 ENV PORT=3000
 ENV DATABASE_URL=file:/data/shakti.db
@@ -27,12 +28,10 @@ ENV DATABASE_URL=file:/data/shakti.db
 # Create SQLite storage directory and app directory owned by non-root node user
 RUN mkdir -p /data /app && chown -R node:node /data /app
 
-COPY --chown=node:node package.json package-lock.json tsconfig.json ./
-RUN npm ci
-
+COPY --chown=node:node package.json package-lock.json .npmrc tsconfig.json ./
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
 COPY --chown=node:node --from=builder /app/dist ./dist
 COPY --chown=node:node --from=builder /app/public ./public
-COPY --chown=node:node data ./data
 COPY --chown=node:node apps ./apps
 COPY --chown=node:node scripts ./scripts
 COPY --chown=node:node server.ts ./
@@ -47,4 +46,3 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["npm", "run", "start"]
-
