@@ -118,10 +118,21 @@ export const PWAInstallButton: React.FC<{
     );
   }
 
-  // Direct synchronous 1-click download link to /shakti.apk
+  const envMeta = (
+    import.meta as unknown as { env?: Record<string, string> }
+  ).env;
+  const rawBaseUrl = envMeta?.BASE_URL || '/';
+  const normalizedBase = rawBaseUrl.endsWith('/')
+    ? rawBaseUrl
+    : `${rawBaseUrl}/`;
+  const apkHref =
+    (envMeta?.VITE_ANDROID_APK_URL || '').trim() ||
+    `${normalizedBase}shakti.apk`;
+
+  // Direct synchronous 1-click download link to shakti.apk (supports both /shakti.apk and GitHub Pages /<repo>/shakti.apk)
   return (
     <a
-      href="/shakti.apk"
+      href={apkHref}
       download="shakti-android.apk"
       data-testid={resolvedTestId}
       aria-label={
