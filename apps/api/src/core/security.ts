@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import type { Response } from 'express';
-import { config, isCookieSecure } from './config';
+import { config, getCookieSameSite, isCookieSecure } from './config';
 import type { UserRole } from '../db/schema';
 
 export const ACCESS_COOKIE_NAME = 'saathi_access_token';
@@ -228,10 +228,11 @@ export function setAuthCookies(res: Response, userId: string, role: UserRole): v
   const accessToken = createAccessToken(userId, role);
   const refreshToken = createRefreshToken(userId, role);
   const secure = isCookieSecure();
+  const sameSite = getCookieSameSite();
 
   res.cookie(ACCESS_COOKIE_NAME, accessToken, {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite,
     secure,
     maxAge: config.accessTokenExpireMinutes * 60 * 1000,
     path: '/',
@@ -239,7 +240,7 @@ export function setAuthCookies(res: Response, userId: string, role: UserRole): v
 
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite,
     secure,
     maxAge: config.refreshTokenExpireDays * 24 * 60 * 60 * 1000,
     path: '/',
@@ -248,8 +249,9 @@ export function setAuthCookies(res: Response, userId: string, role: UserRole): v
 
 export function clearAuthCookies(res: Response): void {
   const secure = isCookieSecure();
-  res.clearCookie(ACCESS_COOKIE_NAME, { path: '/', secure, httpOnly: true, sameSite: 'lax' });
-  res.clearCookie(REFRESH_COOKIE_NAME, { path: '/', secure, httpOnly: true, sameSite: 'lax' });
+  const sameSite = getCookieSameSite();
+  res.clearCookie(ACCESS_COOKIE_NAME, { path: '/', secure, httpOnly: true, sameSite });
+  res.clearCookie(REFRESH_COOKIE_NAME, { path: '/', secure, httpOnly: true, sameSite });
 }
 
 export function hashInvitationToken(token: string): string {

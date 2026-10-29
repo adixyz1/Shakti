@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { eq } from 'drizzle-orm';
-import { config, isDemoModeEnabled } from './config';
+import { config, isAllowedCorsOrigin, isDemoModeEnabled } from './config';
 import { getDb } from './db';
 import {
   ACCESS_COOKIE_NAME,
@@ -20,6 +20,35 @@ export function isZeroAuthDemoAllowed(): boolean {
     return false;
   }
   return isDemoModeEnabled();
+}
+
+export function corsMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
+  const originHeader = req.headers.origin;
+  if (typeof originHeader === 'string' && originHeader.trim()) {
+    const cleanOrigin = originHeader.trim();
+    if (isAllowedCorsOrigin(cleanOrigin)) {
+      res.setHeader('Access-Control-Allow-Origin', cleanOrigin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader(
+        'Access-Control-Allow-Methods',
+        'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS'
+      );
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Authorization, X-Demo-Role, Accept'
+      );
+    }
+  }
+  if (req.method.toUpperCase() === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+  next();
 }
 
 declare global {
@@ -149,13 +178,10 @@ export function csrfProtectionMiddleware(
 
   const originHost = parsedOrigin.host.toLowerCase();
   const originBase = `${parsedOrigin.protocol}//${parsedOrigin.host}`.toLowerCase();
-  const allowedOrigins = new Set(
-    config.corsOrigins.map((o) => o.trim().toLowerCase())
-  );
 
   if (
     (effectiveHost && originHost === effectiveHost) ||
-    allowedOrigins.has(originBase)
+    isAllowedCorsOrigin(originBase)
   ) {
     next();
     return;

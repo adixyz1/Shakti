@@ -12,6 +12,7 @@ import {
 } from './src/core/config';
 import { closeDatabase, initDatabase } from './src/core/db';
 import {
+  corsMiddleware,
   csrfProtectionMiddleware,
   securityHeadersMiddleware,
 } from './src/core/middleware';
@@ -66,6 +67,7 @@ export function createApp(): Express {
   }
 
   app.use(securityHeadersMiddleware);
+  app.use(corsMiddleware);
   // Explicitly block any HTTP access to SQLite database or WAL/SHM artifacts
   app.use((req, res, next) => {
     const cleanPath = (req.path || '').toLowerCase();

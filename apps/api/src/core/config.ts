@@ -128,6 +128,60 @@ export function isCookieSecure(): boolean {
   return nodeEnv === 'production';
 }
 
+export function getCookieSameSite(): 'lax' | 'none' | 'strict' {
+  const raw = (process.env.COOKIE_SAME_SITE || '').trim().toLowerCase();
+  if (raw === 'none' && isCookieSecure()) {
+    return 'none';
+  }
+  if (raw === 'strict') {
+    return 'strict';
+  }
+  return 'lax';
+}
+
+export function getAllowedCorsOrigins(): string[] {
+  const raw =
+    process.env.CORS_ORIGINS ||
+    'http://localhost:3000,http://localhost:5173,https://*.github.io';
+  return raw
+    .split(',')
+    .map((s) => s.trim().replace(/\/+$/, '').toLowerCase())
+    .filter(Boolean);
+}
+
+export function isAllowedCorsOrigin(originInput: string): boolean {
+  const cleaned = (originInput || '').trim().replace(/\/+$/, '').toLowerCase();
+  if (!cleaned) return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(cleaned);
+  } catch {
+    return false;
+  }
+  const originBase = `${parsed.protocol}//${parsed.host}`.toLowerCase();
+  const allowedList = getAllowedCorsOrigins();
+
+  for (const pattern of allowedList) {
+    if (pattern === '*') {
+      return true;
+    }
+    if (pattern === originBase) {
+      return true;
+    }
+    // Support wildcard subdomains such as https://*.github.io or https://*.onrender.com
+    if (pattern.startsWith('https://*.')) {
+      const suffix = pattern.slice('https://*'.length); // e.g. ".github.io"
+      if (
+        parsed.protocol === 'https:' &&
+        parsed.hostname.toLowerCase().endsWith(suffix)
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export const config = {
   environment: process.env.ENVIRONMENT || process.env.NODE_ENV || 'development',
   demoMode: (process.env.DEMO_MODE || '').trim().toLowerCase() === 'true',
@@ -181,9 +235,6 @@ export const config = {
   reportDailyCapPerReporter: Number(
     process.env.REPORT_DAILY_CAP_PER_REPORTER || 5
   ),
-  corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:5173')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean),
+  corsOrigins: getAllowedCorsOrigins(),
   enableAiAssist: process.env.ENABLE_AI_ASSIST === 'true',
 };

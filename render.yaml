@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: shakti-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: DEMO_MODE
+        value: "true"
+      - key: SERVE_STATIC
+        value: "true"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_SAME_SITE
+        value: none
+      - key: TRUST_PROXY
+        value: "1"
+      - key: ALLOW_MOCK_PROVIDERS
+        value: "true"
+      - key: CORS_ORIGINS
+        value: https://*.github.io,http://localhost:3000,http://localhost:5173
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: HMAC_SECRET_KEY
+        generateValue: true

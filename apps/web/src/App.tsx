@@ -227,9 +227,15 @@ export function AppRoutes() {
 }
 
 export default function App() {
+  const rawBaseUrl =
+    (import.meta as unknown as { env?: Record<string, string> }).env
+      ?.BASE_URL || '/';
+  const routerBasename =
+    rawBaseUrl === '/' ? '/' : rawBaseUrl.replace(/\/+$/, '');
+
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename={routerBasename}>
         <AppRoutes />
       </BrowserRouter>
     </QueryClientProvider>

@@ -3,7 +3,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 // @ts-ignore
 import cookie from 'cookie';
 import { eq } from 'drizzle-orm';
-import { config } from '../core/config';
+import { config, isAllowedCorsOrigin } from '../core/config';
 import { getDb } from '../core/db';
 import { ACCESS_COOKIE_NAME, verifyToken } from '../core/security';
 import { incidents, type UserRole } from '../db/schema';
@@ -245,13 +245,10 @@ export function isValidWebSocketOrigin(request: http.IncomingMessage): boolean {
 
   const originHost = parsedOrigin.host.toLowerCase();
   const originBase = `${parsedOrigin.protocol}//${parsedOrigin.host}`.toLowerCase();
-  const allowedOrigins = new Set(
-    config.corsOrigins.map((o) => o.trim().toLowerCase())
-  );
 
   return Boolean(
     (effectiveHost && originHost === effectiveHost) ||
-    allowedOrigins.has(originBase)
+    isAllowedCorsOrigin(originBase)
   );
 }
 
