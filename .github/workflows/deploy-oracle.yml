@@ -1,0 +1,26 @@
+name: Deploy to Oracle Cloud VM (Optional Auto-Update)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  deploy-oracle:
+    name: Update Oracle Cloud VM via SSH
+    runs-on: ubuntu-latest
+    # Only runs if ORACLE_HOST secret is configured in GitHub repository settings
+    if: ${{ secrets.ORACLE_HOST != '' }}
+
+    steps:
+      - name: Trigger safe atomic backup + update on Oracle Cloud VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ${{ secrets.ORACLE_USER || 'ubuntu' }}
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          port: ${{ secrets.ORACLE_PORT || 22 }}
+          script: |
+            cd ~/shakti || cd ~/saathi
+            chmod +x scripts/oracle_update.sh
+            ./scripts/oracle_update.sh

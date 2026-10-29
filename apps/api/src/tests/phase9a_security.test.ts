@@ -201,6 +201,13 @@ export const REGISTERED_ROUTE_ACCESS_TABLE: RouteAuthSpec[] = [
   { method: 'GET', path: '/admin/audit-logs', accessClass: 'admin' },
   { method: 'GET', path: '/admin/responders', accessClass: 'admin' },
   { method: 'PATCH', path: '/admin/responders/:id', accessClass: 'admin' },
+
+  // Android APK Distribution & TWA Digital Asset Links (server.ts)
+  { method: 'GET', path: '/.well-known/assetlinks.json', accessClass: 'public' },
+  { method: 'GET', path: '/apk-status', accessClass: 'public' },
+  { method: 'GET', path: '/shakti.apk', accessClass: 'public' },
+  { method: 'GET', path: '/saathi.apk', accessClass: 'public' },
+  { method: 'GET', path: '/download/apk', accessClass: 'public' },
 ];
 
 function extractExpressRoutes(
@@ -550,6 +557,12 @@ describe('Phase 9A: Security Hardening (Safeguards, Auth Sweep, CSRF, Headers/Li
       expect(accessCookie).toMatch(/HttpOnly/i);
       expect(accessCookie).toMatch(/SameSite=Lax/i);
       expect(accessCookie).toMatch(/Secure/i);
+
+      // Verify client-controlled X-Demo-Role header is strictly rejected in production
+      const demoHeaderBypassAttempt = await request(app)
+        .get('/api/admin/metrics')
+        .set('X-Demo-Role', 'admin');
+      expect(demoHeaderBypassAttempt.status).toBe(401);
     } finally {
       process.env.NODE_ENV = prevNodeEnv;
     }
@@ -581,6 +594,13 @@ describe('Phase 9A: Security Hardening (Safeguards, Auth Sweep, CSRF, Headers/Li
     resetRateLimiter();
 
     function resolvePath(template: string): string {
+      if (
+        template === '/.well-known/assetlinks.json' ||
+        template === '/shakti.apk' ||
+        template === '/saathi.apk'
+      ) {
+        return template;
+      }
       return `/api${template}`
         .replace(':token', template.startsWith('/c/') ? contactMagicToken : invitationToken)
         .replace(

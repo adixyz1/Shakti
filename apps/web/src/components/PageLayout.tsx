@@ -15,7 +15,10 @@ import {
 } from '../lib/offlineQueue';
 import { PWAInstallButton } from './PWAInstallButton';
 import { DemoModeBanner } from './DemoModeBanner';
-import { isStandaloneAndroidApk } from '../lib/standaloneApkApi';
+import {
+  isPrototypeZeroAuthMode,
+  isStandaloneAndroidApk,
+} from '../lib/standaloneApkApi';
 
 const TRIPLE_TAP_WINDOW_MS = 1000;
 
@@ -26,6 +29,7 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
   const { user, setUser, darkMode, toggleDarkMode } = useAuthStore();
   const { tripleTapEnabled, tripleTapZone } = useTriggerSettingsStore();
   const isApk = isStandaloneAndroidApk();
+  const isZeroAuth = isPrototypeZeroAuthMode();
 
   const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine !== false : true
@@ -126,7 +130,7 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
           {/* Zone 2: Clean text navigation links */}
           <nav
             aria-label="Primary navigation"
-            className="hidden md:flex items-center gap-1 lg:gap-2 text-xs lg:text-sm font-medium text-slate-700 dark:text-slate-200 overflow-x-auto no-scrollbar py-1"
+            className="hidden md:flex items-center gap-1 lg:gap-1.5 text-xs lg:text-sm font-medium text-slate-700 dark:text-slate-200 overflow-x-auto no-scrollbar py-1"
           >
             <Link
               to={user ? '/home' : '/'}
@@ -138,7 +142,7 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             >
               {t('nav.home')}
             </Link>
-            {user && (
+            {(user || isZeroAuth) && (
               <>
                 <Link
                   to="/journeys"
@@ -174,6 +178,17 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                   {t('resources.navLink')}
                 </Link>
                 <Link
+                  to="/safety-tools"
+                  data-testid="nav-safety-tools-link"
+                  className={`min-h-[38px] px-2.5 py-1.5 rounded-lg inline-flex items-center whitespace-nowrap transition-colors ${
+                    location.pathname === '/safety-tools'
+                      ? 'text-teal-800 dark:text-teal-300 font-semibold bg-teal-50 dark:bg-teal-950/60'
+                      : 'hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                  }`}
+                >
+                  {t('safetyTools.navLink', 'Safety Tools')}
+                </Link>
+                <Link
                   to="/circle"
                   className={`min-h-[38px] px-2.5 py-1.5 rounded-lg inline-flex items-center whitespace-nowrap transition-colors ${
                     location.pathname === '/circle'
@@ -203,7 +218,7 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                 >
                   {t('nav.settings')}
                 </Link>
-                {user.role === 'responder' && (
+                {(user?.role === 'responder' || isZeroAuth) && (
                   <Link
                     to="/responder"
                     data-testid="nav-responder-link"
@@ -216,7 +231,7 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                     {t('responderDashboard.title')}
                   </Link>
                 )}
-                {user.role === 'admin' && (
+                {(user?.role === 'admin' || isZeroAuth) && (
                   <Link
                     to="/admin"
                     data-testid="nav-admin-link"
@@ -265,7 +280,7 @@ export const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }
           >
             {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
-          {!isApk && (
+          {!isApk && !isZeroAuth && (
             user ? (
               <Button variant="outline" onClick={handleLogout}>
                 {t('nav.signOut')}

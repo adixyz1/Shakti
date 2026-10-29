@@ -94,4 +94,12 @@ This document provides a realistic, unembellished assessment of the technical bo
 - **Outbound Links Leave the Application**: Outbound links redirect to third-party web destinations that operate independently under their own privacy policies and terms of service.
 - **Jurisdictional & Regulatory Differences**: Laws and carriage rules for personal safety devices (such as pepper spray or alarms) vary across jurisdictions, transit authorities, aviation rules, and institutional premises, and may evolve over time. Users must verify local regulations independently.
 
+---
+
+## 14. Cloud Hosting Free-Tier, Offline Delivery States & APK Update Boundaries
+
+- **₹0 Hosting is a Target Constraint, Not a Permanent Guarantee**: Deploying on Oracle Cloud Always Free (`VM.Standard.A1.Flex` within 2 OCPUs / 12 GB RAM and 200 GB storage) targets ₹0/month recurring cost under current provider rules, but cloud providers can modify free-tier eligibility, reclaim idle compute instances, or bill for overages if upgraded to Pay-As-You-Go.
+- **Strict Distinction Between Offline Queueing and Confirmed Delivery**: Saving an SOS alert in device storage (`saved_locally` or `pending` in IndexedDB) does **not** mean emergency contacts or responders have been notified. An alert only reaches the server when transitioned to `server_acknowledged`, and contact notification is only confirmed at `contact_notification_confirmed` (which in demo mode remains simulated via mock providers).
+- **Sideloaded Android APK Updates Are Not Automatic**: Deploying backend or web updates to the Oracle server updates the hosted website and PWA immediately, and replacing `/shakti.apk` updates the download package for new installs. However, already-installed sideloaded Capacitor APKs on user phones do **not** auto-update in the background without an app store; users must download and install the updated APK file when native or bundled assets change.
+
 

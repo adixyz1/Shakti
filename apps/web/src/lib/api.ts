@@ -1,12 +1,14 @@
 import { UserProfile } from '../store/authStore';
 import {
+  getActivePrototypeRole,
   handleStandaloneApkApiRequest,
+  isPrototypeZeroAuthMode,
   isStandaloneAndroidApk,
 } from './standaloneApkApi';
-
-const API_BASE =
-  (import.meta as unknown as { env?: Record<string, string> }).env
-    ?.VITE_API_BASE_URL || '/api';
+import {
+  getServerConfig,
+  resolveEffectiveApiBaseUrl,
+} from './serverConfig';
 
 export class ApiError extends Error {
   public status: number;
@@ -24,9 +26,10 @@ async function attemptTokenRefresh(fetchImpl: typeof fetch): Promise<boolean> {
     return refreshPromise;
   }
   isRefreshing = true;
+  const apiBase = resolveEffectiveApiBaseUrl();
   refreshPromise = (async () => {
     try {
-      const res = await fetchImpl(`${API_BASE}/auth/refresh`, {
+      const res = await fetchImpl(`${apiBase}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -47,21 +50,42 @@ export async function apiRequest<T>(
   options: RequestInit = {},
   fetchImpl: typeof fetch = fetch
 ): Promise<T> {
-  if (isStandaloneAndroidApk()) {
+  const srvCfg = getServerConfig();
+  if (
+    srvCfg.mode === 'standalone' ||
+    (isStandaloneAndroidApk() && !srvCfg.remoteServerUrl)
+  ) {
     return handleStandaloneApkApiRequest<T>(path, options);
   }
 
-  const url = `${API_BASE}${path}`;
+  // Only attach X-Demo-Role in local/preview zero-auth demo mode when no custom remote production server URL is configured
+  const hasCustomRemoteServer = Boolean(srvCfg.remoteServerUrl);
+  const zeroAuthDemo = !hasCustomRemoteServer && isPrototypeZeroAuthMode();
+  const demoRoleHeader: Record<string, string> = zeroAuthDemo
+    ? { 'X-Demo-Role': getActivePrototypeRole() }
+    : {};
+
+  const apiBase = resolveEffectiveApiBaseUrl();
+  const url = `${apiBase}${path}`;
   const config: RequestInit = {
     ...options,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...demoRoleHeader,
       ...(options.headers || {}),
     },
   };
 
-  let response = await fetchImpl(url, config);
+  let response: Response;
+  try {
+    response = await fetchImpl(url, config);
+  } catch (err) {
+    if (zeroAuthDemo) {
+      return handleStandaloneApkApiRequest<T>(path, options);
+    }
+    throw err;
+  }
 
   // Automatic token refresh on 401 (except when calling auth or public invitation/contact endpoints)
   if (
@@ -78,6 +102,16 @@ export async function apiRequest<T>(
   }
 
   if (!response.ok) {
+    // Only fall back to local prototype handler when zeroAuthDemo is active (never silently downgrade 401/403 on a configured remote server)
+    if (
+      zeroAuthDemo &&
+      (response.status === 401 ||
+        response.status === 403 ||
+        (response.status === 404 && path.startsWith('/demo/')))
+    ) {
+      return handleStandaloneApkApiRequest<T>(path, options);
+    }
+
     let errorDetail = `Request failed with status ${response.status}`;
     try {
       const body = await response.json();
@@ -894,22 +928,42 @@ export const adminMetricsApi = {
     if (params?.from) sp.set('from', params.from);
     if (params?.to) sp.set('to', params.to);
     const qs = sp.toString();
-    return qs ? `${API_BASE}/admin/metrics.csv?${qs}` : `${API_BASE}/admin/metrics.csv`;
+    const apiBase = resolveEffectiveApiBaseUrl();
+    return qs ? `${apiBase}/admin/metrics.csv?${qs}` : `${apiBase}/admin/metrics.csv`;
   },
 
   downloadMetricsCsvText: async (
     params?: { from?: string; to?: string },
     fetchImpl: typeof fetch = fetch
   ): Promise<string> => {
-    const url = adminMetricsApi.getMetricsCsvUrl(params);
-    const res = await fetchImpl(url, {
-      method: 'GET',
-      credentials: 'include',
-    });
-    if (!res.ok) {
-      throw new ApiError(res.status, 'Failed to download CSV');
+    const zeroAuth = isPrototypeZeroAuthMode();
+    if (!isStandaloneAndroidApk()) {
+      try {
+        const url = adminMetricsApi.getMetricsCsvUrl(params);
+        const res = await fetchImpl(url, {
+          method: 'GET',
+          credentials: 'include',
+          headers: zeroAuth ? { 'X-Demo-Role': 'admin' } : undefined,
+        });
+        if (res.ok) {
+          return res.text();
+        }
+        if (!zeroAuth) {
+          throw new ApiError(res.status, 'Failed to download CSV');
+        }
+      } catch (err) {
+        if (!zeroAuth) throw err;
+      }
     }
-    return res.text();
+    const data = await adminMetricsApi.getMetrics(params, fetchImpl);
+    const rows = [
+      'metric,value,n,target,formula,insufficient_data',
+      ...Object.values(data.metrics).map(
+        (m) =>
+          `"${m.metric}",${m.value ?? ''},${m.n},"${m.target ?? ''}","${m.formula}",${m.insufficient_data}`
+      ),
+    ];
+    return rows.join('\n');
   },
 };
 

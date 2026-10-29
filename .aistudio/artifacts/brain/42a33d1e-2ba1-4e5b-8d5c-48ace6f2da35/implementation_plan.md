@@ -1,173 +1,116 @@
-# Implementation Plan: SAATHI Prototype Redesign (Stitch 'Paper Utility' System)
+# SAATHI / SHAKTI — ₹0 Oracle Cloud Hosting, Hybrid Mobile APK & Auto-Update Plan
 
-Restyle the entire SAATHI (Safety Assistance & Alert Technology for Help & Intervention) web application to adopt the high-contrast, flat editorial **Paper Utility** design language exported from Stitch across all 16 mapped screens, while preserving 100% of the underlying Express API, SQLite database, offline Dexie queue, dual-PIN duress safety, and test suites.
-
----
+Deliver a complete, zero-cost (₹0/month) hosting and mobile app distribution setup on Oracle Cloud Always Free (Ampere A1), including automatic HTTPS via free subdomains (`nip.io` or `DuckDNS`), hybrid offline-first + live-server sync for the Android APK, and one-command + GitHub Actions automatic updates whenever you modify the website or mobile app.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The clarifying questions were answered with the recommended baseline defaults. Below are the governing architectural and visual commitments for this redesign:
+> **Oracle Cloud Always Free Hardware Limit Check (₹0 Guarantee):**
+> The PDF guide you shared mentions `4 OCPUs / 24 GB RAM`, which exceeds Oracle's current official Always Free allowance (`2 OCPUs` and `12 GB RAM` total across Ampere A1 instances, plus `200 GB` block storage). Our automated setup and guide strictly configure **2 OCPUs, 12 GB RAM, and 50–100 GB storage** on an Always Free account so your bill remains **₹0 forever** without needing to upgrade to Pay-As-You-Go.
 
-- **Confirmed Visual Aesthetic**: Strict **Paper Utility** design standard (`#F3F1EC` paper canvas, `#FAF8F4` surface, `#0F172A` ink, `#D6D2C8` hairline borders, 0px–2px corner radii, zero drop shadows, zero color gradients, zero decorative pill badges).
-- **Confirmed Execution Flow**: Phased milestone rollout starting with design system primitives & tokens, followed by the core SOS emergency flow, user safety workflows, responder/admin consoles, and legal/localization verification.
-- **Confirmed Iconography Strategy**: Migration from external icon packages to lightweight custom inline 24px SVGs with 2px stroke, square line caps, and miter joins as designed in Stitch.
-- **Guaranteed Functionality Retention**: Every existing route (`/home`, `/circle`, `/consents`, `/journeys`, `/reports`, `/resources`, `/settings`, `/login`, `/c/:token`, `/responder`, `/admin`), API integration, offline queue synchronization, dual-PIN deception architecture, and unit/E2E test suite remains fully operational.
+- **Confirmed Decision 1 — Free HTTPS Domain (`DuckDNS` or `nip.io`)**: Use Caddy reverse proxy in Docker to automatically issue and renew free Let's Encrypt TLS certificates for either a zero-signup `<PUBLIC_IP>.nip.io` address or a free `<name>.duckdns.org` subdomain. HTTPS is mandatory for mobile GPS geolocation, Service Workers, and PWA installation.
+- **Confirmed Decision 2 — Hybrid Android APK (Standalone Offline + Live Server Sync)**: Enhance the Android APK API layer so it works 100% offline/standalone out of the box, while seamlessly syncing with your live Oracle Cloud server when connected (configurable automatically during build or in the in-app Settings screen).
+- **Confirmed Decision 3 — One-Command Update + GitHub Actions Auto-Deploy**: Provide both a single-command server update script (rebuilds the web bundle, compiles the latest Android APK, and restarts the container without losing database state) and an automated GitHub Actions deployment workflow triggered on `git push`.
 
 ---
 
 ## 1. Overview & Core Concept
 
-### What It Does
-Transforms the visual identity of SAATHI from a generic rounded-card web interface into an authoritative, calm, high-contrast **editorial paper utility**. The interface is purpose-built for women navigating acute physical or emotional distress, low-light outdoor environments, and one-handed thumb interaction under physical constraint.
-
-### Target Audience & Operational Personas
-1. **Primary Survivor / Commuter (Mobile PWA)**: Needs a 72px zero-ambiguity SOS trigger, tactile 3x4 PIN pad with indistinguishable cancel vs duress timing, and real-time confirmed transmission status.
-2. **Trusted Contact (Mobile Web)**: Inspects alert magic links with reverse-geocoded landmarks, GPS accuracy radius, and ambient audio playback without needing an account.
-3. **Campus / Community Responder & Admin (1440px Desktop Console)**: Triages incoming emergency dispatches with a dense tabular incident queue, zone routing, and tamper-evident audit logs.
-
-### Key Value
-Eliminates cognitive friction and false promises: zero artificial "help is arriving in 2 minutes" conjectures, zero skeuomorphic eye-candy, and immediate access to verified national emergency voice lines (112 & 181).
+- **What It Does**:
+  1. **Hosts the Full-Stack Website for ₹0**: Runs the Express API, WebSocket real-time hub, SQLite persistent database, and React PWA frontend inside Docker on an Oracle Cloud Always Free Ampere A1 VM (`ARM64`), fronted by Caddy for automatic HTTPS.
+  2. **Hosts & Distributes the Mobile App for ₹0**: Serves both the installable PWA (Android & iOS) and the direct 1-tap downloadable Android APK (`/shakti.apk`) directly from your Oracle Cloud server.
+  3. **Hybrid Mobile APK Connectivity**: Allows installed Android APK users to operate completely offline/standalone on their device or sync live SOS alerts, responder actions, and trusted contact links with your Oracle Cloud server.
+  4. **Zero-Downtime Updates**: Lets you edit code anytime and publish updates to both the website and hosted mobile app via a single SSH command or automatic GitHub push.
+- **Target Audience / Persona**: Project owner/developer deploying SAATHI/SHAKTI on a ₹0 student/prototype budget, and mobile testers/judges installing the app on Android or iOS phones.
+- **Key Value**: Eliminates cloud hosting bills and app-store fees while ensuring real-phone HTTPS features (GPS, Web Audio siren/fake call, offline queue, and APK downloads) work reliably.
 
 ---
 
 ## 2. User Experience & Visual Design
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        PAPER UTILITY COLOR SYSTEM                      │
-├──────────────────┬─────────────────┬──────────────────┬────────────────┤
-│ Canvas: Paper    │ Surface Tier    │ Primary Ink      │ Hairline Line  │
-│ #F3F1EC          │ #FAF8F4         │ #0F172A          │ #D6D2C8 (1px)  │
-├──────────────────┼─────────────────┼──────────────────┼────────────────┤
-│ Action: Teal 700 │ Active Teal 800 │ Emergency Crimson│ Dark Mode Base │
-│ #0F766E          │ #115E59         │ #9F1239 (SOS)    │ #020617 (Night)│
-└──────────────────┴─────────────────┴──────────────────┴────────────────┘
-```
-
-### Visual Identity & Theme
-- **Surface Elevation**: Completely flat. Depth is achieved strictly through tonal alternation between `paper` (`#F3F1EC`) and `surface` (`#FAF8F4`) separated by crisp 1px hairline rules in `line` (`#D6D2C8`). No box shadows or blur scrims.
-- **Geometric Radius**: Standard 2px corner radius for cards, inputs, and secondary buttons. Absolute 0px radius (`rounded-none`) for full-width emergency banners, bottom sheets, and the 72px crimson SOS `BigButton`.
-- **Night / Dark Mode Inversion**: Uses `night` (`#020617`), `night-surface` (`#0B1220`), `night-line` (`#1E293B`), and `night-text` (`#E7E5DF`). Pure `#FFFFFF` and `#000000` are prohibited to eliminate harsh night glare.
-- **Typographic Scale**:
-  - Primary Display: **Plus Jakarta Sans** (700 Bold, 32px mobile / 36px desktop).
-  - Devanagari Script: **Noto Sans Devanagari** (expanded 1.6 line height for matra clearance).
-  - Body Text: 16px minimum base font size with 1.5 line height.
-  - Telemetry & PINs: Tabular figures (`font-mono tabular-nums`) mandatory for countdowns, phone numbers, and coordinates.
-- **Top Bar Contract (3 Zones)**:
-  - Zone 1 (Left): Single-line text wordmark `SAATHI` in Plus Jakarta Sans.
-  - Zone 2 (Center): 4–5 single-line text links with subtle hover underlines (`Home`, `Circle`, `Journeys`, `Reports`, `Resources`).
-  - Zone 3 (Right): Single-action cluster featuring the flat network connectivity pill (`Online` / `Offline`), language toggle (`EN` / `HI`), and auth trigger.
-- **Mobile Bottom Navigation**: Anchored 56px height, 4 thumb-accessible tabs with 24px custom inline SVGs and 10px uppercase labels.
+- **Key User Flows**:
+  1. **First-Time Oracle Cloud Setup**: You run a single bootstrap script on your fresh Ubuntu VM (`2 OCPU / 12 GB RAM`), which opens firewall ports `80/443`, installs Docker, configures your free `<IP>.nip.io` or `.duckdns.org` HTTPS domain, and starts SAATHI.
+  2. **Mobile App Installation Flow**: Visitors open your HTTPS URL on their phone and tap **"Download Android App (.apk)"** or **"Add to Home Screen"** (iOS/Android PWA) in 1–2 taps.
+  3. **Hybrid Mobile Server Sync Flow (Settings)**: Inside the mobile app's **Settings** page, a clean, calm **Cloud Server Sync (Optional)** card shows whether the app is operating in **Local Standalone Mode** or synced with a **Live Server URL**, allowing 1-tap switching or testing connection health without clutter.
+  4. **Making Changes Later**: When you edit any UI or backend feature, pushing to GitHub (or running the update script) automatically rebuilds the website, regenerates the downloadable `/shakti.apk` with your new changes, and restarts the server while keeping `/data/shakti.db` intact.
+- **Visual Identity & Theme**:
+  - *Aesthetic Direction*: Calm, high-contrast Paper Utility safety interface matching the existing app design.
+  - *Color Palette & Mood*: Warm alabaster/slate surfaces (`bg-slate-50` / `dark:bg-slate-900`), deep slate typography (`text-slate-900` / `dark:text-white`), and trustworthy teal accents (`bg-teal-700`) for install/sync status badges. No heavy gradients.
+  - *Typography & Hierarchy*: Clear, scannable status indicators with large touch targets (`min-h-[44px]`) for one-hand mobile operation.
+  - *Interactive Feedback & Motion*: Instant connection test feedback badge ("Connected to Live Server" vs. "Offline Standalone Ready — Auto-fallback active") and toast confirmation when updating the server URL.
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-### Decision 1: Strict Flat Hairline Utility vs Soft Modern Glassmorphism
-- **Chosen Approach**: Flat 1px hairline borders (`#D6D2C8`), 0–2px radii, zero box shadows, zero background blurs.
-- **Why**: Under bright sunlight or high-stress tremors, blurred glass layers and soft drop shadows degrade edge contrast. Crisp 1px hairlines ensure immediate visual demarcation.
-- **Alternatives Considered**: Retaining rounded-2xl cards with soft shadows was rejected as it conflicts with the Paper Utility spec and induces visual clutter.
+- **Decision 1: Caddy Reverse Proxy + `nip.io` / `DuckDNS` for Zero-Cost HTTPS**
+  - *Chosen Approach*: Bundle a lightweight Caddy service in Docker Compose that automatically provisions Let's Encrypt SSL certificates for `<ORACLE_PUBLIC_IP>.nip.io` (zero registration required) or `<yourname>.duckdns.org`.
+  - *Why*: Mobile browsers block `navigator.geolocation` (GPS), Service Workers, and Web Wake Lock on plain `http://` IP addresses. Caddy + `nip.io` gives instant valid HTTPS with ₹0 domain cost.
+  - *Alternatives Considered*: Self-signed certificates (rejected because phones show scary security warnings and block PWA service workers).
 
-### Decision 2: Hold-to-Trigger SOS with Horizontal Fill vs Instant Tap
-- **Chosen Approach**: 72px high full-width crimson button (`#9F1239`, 0px radius) with a 2-second linear progress fill on hold, followed by the 5-second countdown window with the 3x4 tabular PIN abort pad.
-- **Why**: Prevents accidental false alarms in pockets while remaining effortless to trigger under acute duress.
-- **Alternatives Considered**: Circular pulsing radial buttons were rejected due to poor one-handed thumb ergonomics.
+- **Decision 2: Hybrid Standalone + Live Server API Routing in Android APK**
+  - *Chosen Approach*: When the APK is built on or connected to your Oracle server, it attempts requests against the configured live HTTPS server URL (`VITE_API_BASE_URL` or user-configured Server URL in Settings) and automatically falls back to the on-device standalone engine (`standaloneApkApi`) if offline or unreachable.
+  - *Why*: Guarantees that emergency SOS, fake calls, loud alarm, and local contacts never fail when a user has poor connectivity, while still allowing multi-device demos (e.g., Responder Dashboard on laptop + SOS on Android APK) when online.
 
-### Decision 3: Vertical `StatusLadder` with Confirmed States Only
-- **Chosen Approach**: Linear progression displaying only verified physical milestones: *Saved on this phone* $\rightarrow$ *Sent* $\rightarrow$ *Delivered to circle* $\rightarrow$ *Acknowledged* $\rightarrow$ *Resolved*.
-- **Why**: Eliminates misleading arrival time claims. Complements official emergency services (112/181) without pretending to replace police dispatch.
+- **Decision 3: Single-Instance SQLite Persistence on Docker Volume**
+  - *Chosen Approach*: Mount the `shakti_data` Docker volume to `/data/shakti.db` on the Oracle VM's boot volume (up to 200 GB free).
+  - *Why*: Zero external database cost, survives all container rebuilds and code updates, and keeps sensitive data self-contained on your instance.
 
 ---
 
-## 4. Technical Architecture & Component Mapping
+## 4. Technical Architecture & Data Strategy *(Technical Reference)*
+
+- **Architecture & Component Diagram**:
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│               COMPONENT MAPPING & REDESIGN FLOW                        │
-├────────────────────────────────────────────────────────────────────────┤
-│ 1. DESIGN TOKENS & CSS                                                 │
-│    src/index.css ──► Paper Utility CSS Variables & Tailwind Theme     │
-├────────────────────────────────────────────────────────────────────────┤
-│ 2. SHARED PRIMITIVES (apps/web/src/components/ui/index.tsx)            │
-│    • BigButton (72px, 0px radius, crimson linear progress)            │
-│    • Button (48px, 2px radius, primary teal / outline / quiet)        │
-│    • Input (48px, 2px radius, 1px line, label above, role="alert")    │
-│    • Card (2px radius, surface fill, 1px line, zero shadow)           │
-│    • Modal & Sheet (flat 60% ink scrim, 0px radius sheet)             │
-│    • StatusLadder (confirmed vertical transmission checkpoints)        │
-│    • Custom Inline SVGs (24px, 2px stroke, square caps, miter joins)  │
-├────────────────────────────────────────────────────────────────────────┤
-│ 3. SCREEN RESTYLING (16 Screens Mapped from Stitch Package)            │
-│    • Screen 01: HomePage (Idle) ◄── home_idle_hindi/code.html         │
-│    • Screen 02: Countdown & 3x4 PIN Pad ◄── home_idle_hindi/code.html │
-│    • Screen 03: SOS Active Ladder ◄── sos_active_status_ladder/       │
-│    • Screen 04: Offline Queue & SMS Fallback ◄── offlineQueue.ts      │
-│    • Screen 05: TrustedCirclePage ◄── emergency_circle/code.html      │
-│    • Screen 06: ConsentCenterPage ◄── consent_center/code.html        │
-│    • Screen 07: SafeJourneyPage ◄── safe_journeys/code.html           │
-│    • Screen 08: SafetyReportsPage & Map ◄── hazard_map/code.html      │
-│    • Screen 09: ResourcesPage (Helplines) ◄── helplines/code.html     │
-│    • Screen 10: SettingsPage ◄── settings/code.html                   │
-│    • Screen 11: LoginPage (Sign In & OTP) ◄── sign_in/code.html       │
-│    • Screen 12: PolicyPage (Legal Covenants) ◄── legal_documentation/ │
-│    • Screen 13: ContactAlertPage ◄── contact_responder_view/code.html │
-│    • Screen 14: Responder & Admin Page ◄── desktop_responder_queue/   │
-│    • Screens 15 & 16: Hindi Localization Parity (Devanagari 1.6 LH)   │
-└────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│             ORACLE CLOUD ALWAYS FREE VM (VM.Standard.A1.Flex)           │
+│                  2 OCPUs • 12 GB RAM • Ubuntu ARM64 (₹0)                │
+│                                                                         │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │ Docker Compose Network                                            │  │
+│  │                                                                   │  │
+│  │  [Internet: Ports 80 / 443]                                       │  │
+│  │              │                                                    │  │
+│  │              ▼                                                    │  │
+│  │  ┌─────────────────────────────────────────────────────────────┐  │  │
+│  │  │ Caddy Reverse Proxy Container                               │  │  │
+│  │  │ • Auto Let's Encrypt HTTPS for <IP>.nip.io or *.duckdns.org │  │  │
+│  │  └───────────────────────────┬─────────────────────────────────┘  │  │
+│  │                              │ HTTP :3000                         │  │
+│  │                              ▼                                    │  │
+│  │  ┌─────────────────────────────────────────────────────────────┐  │  │
+│  │  │ SAATHI / SHAKTI App Container (Node 22 + Express + WS)      │  │  │
+│  │  │ • Serves React PWA Bundle (dist/)                           │  │  │
+│  │  │ • Serves Direct Android App Download (/shakti.apk)          │  │  │
+│  │  │ • REST API (/api/*) & Real-Time WebSocket Hub (/ws)         │  │  │
+│  │  └───────────────────────────┬─────────────────────────────────┘  │  │
+│  │                              │                                    │  │
+│  │                              ▼                                    │  │
+│  │  ┌─────────────────────────────────────────────────────────────┐  │  │
+│  │  │ Persistent Docker Volume (shakti_data -> /data/shakti.db)   │  │  │
+│  │  │ • Retains SQLite DB across code updates & restarts          │  │  │
+│  │  └─────────────────────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────▲────────────────────────────────────┘
+                                     │
+         ┌───────────────────────────┴───────────────────────────┐
+         │                                                       │
+┌────────┴───────────────────────────────┐     ┌─────────────────┴────────────────┐
+│ Android APK & Mobile PWA Clients       │     │ Auto-Update Pipeline             │
+│ • Hybrid API Router:                   │     │ • One-Command Update Script      │
+│   1. Live Oracle Server Sync (Online)  │     │ • GitHub Actions SSH Auto-Deploy │
+│   2. Local Standalone Engine (Offline) │     │ • Auto-rebuilds Web + APK        │
+└────────────────────────────────────────┘     └──────────────────────────────────┘
 ```
 
----
-
-## 5. Milestone Implementation Sequence
-
-### Milestone R0: Design Tokens & CSS Foundation
-- Update `src/index.css` with the complete Paper Utility token palette (`--color-paper: #F3F1EC`, `--color-surface: #FAF8F4`, `--color-ink: #0F172A`, `--color-line: #D6D2C8`, `--color-teal-700: #0F766E`, `--color-crimson-800: #9F1239`, `--color-night: #020617`, etc.).
-- Set base typography rules: Plus Jakarta Sans for Latin, Noto Sans Devanagari for Hindi, tabular numerals for numbers.
-
-### Milestone R1: Shared UI Primitives & Inline SVGs
-- Refactor `apps/web/src/components/ui/index.tsx`:
-  - `BigButton`: 72px height, 0px radius, flat crimson fill, linear hold-to-activate progress.
-  - `Button`: 48px height, 2px radius, primary teal / outline / quiet variants.
-  - `Input`: 48px height, 2px radius, 1px line border, surface background.
-  - `Card`: 2px radius, surface background, 1px hairline border, zero box shadows.
-  - `Modal` / `Sheet`: Flat ink 60% scrim, 0px bottom sheet geometry, visible text dismiss button.
-  - Custom Inline SVG components replacing Lucide imports across shared primitives.
-
-### Milestone R2: Core SOS & Navigation Shell
-- Restyle `PageLayout.tsx`: Top App Bar with strict 3-zone layout, flat online/offline pill, statutory footer.
-- Restyle `HomePage.tsx`:
-  - State 1: Idle Home with 72px hold-to-trigger SOS button, circle readiness indicator, and discreet utility triggers.
-  - State 2: Countdown window with flat 5-second timer and 3x4 tabular PIN pad with identical duress timing parity.
-  - State 3: Active Emergency with vertical confirmed `StatusLadder` and 48px action cluster (*I am safe*, *Call 112*, *Call 181*).
-  - State 4: Offline Queue banner with telemetry cache audit and direct SMS relay trigger.
-
-### Milestone R3: User Safety Workflows
-- Restyle `TrustedCirclePage.tsx` (Screen 05): 3 of 5 active contact indicator, priority ordering, SMS invite drawer.
-- Restyle `ConsentCenterPage.tsx` (Screen 06): Grouped switches with explicit `On`/`Off` text, statutory sensor disclosures.
-- Restyle `SafeJourneyPage.tsx` (Screen 07): Walk duration selector chips (`15m`, `30m`, `45m`, `60m`), active countdown timer (`18:39`), statutory guarantee banner.
-- Restyle `SafetyReportsPage.tsx` (Screen 08): Clean 1px cartographic hazard map, cluster indicators, 14-day expiry note.
-- Restyle `ResourcesPage.tsx` (Screen 09): Direct 112 & 181 call cards, specialized lines, verification audit stamps.
-- Restyle `SettingsPage.tsx` (Screen 10): PIN setup, countdown interval chips, disguise calculator mode, cryptographic data shredding.
-- Restyle `LoginPage.tsx` (Screen 11): Country-coded 48px phone field, tabular 6-digit OTP boxes, statutory terms links.
-
-### Milestone R4: Responders, Contact Magic Links & Admin Console
-- Restyle `ContactAlertPage.tsx` (Screen 13): Zero-account view with reverse-geocoded coordinates, GPS accuracy badge, ambient audio player, and response buttons.
-- Restyle `ResponderDashboardPage.tsx` & `AdminPage.tsx` (Screen 14): 1440px dense operational desk, metric strip (Active Dispatches, Response Times, 112 Relays), incident triage table, and CSV audit export.
-
-### Milestone R5: Legal Documentation, Hindi Localization & Verification
-- Restyle `PolicyPage.tsx` (Screen 12): Plain-language covenants (*What SHAKTI Does* vs *What SHAKTI Does Not Do*), offline PDF/print view.
-- Verify Hindi localization parity on all screens (Screens 15 & 16) with 1.6 line-height Devanagari rendering.
-- Run `compile_applet`, `lint_applet`, and all Vitest / Playwright test suites to ensure 100% build and behavioral verification.
-
----
-
-## 6. Verification & Test Plan
-
-1. **Compilation & Typing Integrity**: Run `compile_applet` and `lint_applet` after each milestone.
-2. **Automated Unit & Integration Tests**: Verify that existing backend and UI tests continue passing (`npm run test:api`, `npm run test:web`).
-3. **Visual & Touch Target Inspection**: Verify with DOM checks that:
-   - All interactive controls have $\ge 48\text{px}$ touch target height ($\ge 72\text{px}$ for SOS).
-   - Zero drop shadows (`shadow-*`) or gradient fills remain.
-   - All component corner radii are strictly $\le 2\text{px}$.
-   - Emergency duress PIN submission produces identical timing and screen transitions as standard cancellation.
+- **Data Model & State**:
+  - **Remote Server Config Store (Client LocalStorage)**: Stores an optional `shakti_remote_server_url` (defaulting to `VITE_API_BASE_URL` or the origin where the APK was downloaded) and a boolean `sync_enabled` toggle.
+  - **Persistent Server SQLite Volume (`/data/shakti.db`)**: Stores users, consents, trusted circle contacts, active incidents, safe journeys, k-anonymous safety reports, and audit logs on the Oracle VM disk.
+- **Interactive Component & State Mapping**:
+  - **Hybrid API Client**: Checks if a remote server URL is configured and reachable; if enabled, sends API requests with `credentials: 'include'` and `X-Demo-Role` header to the Oracle Cloud server, and transparently falls back to `handleStandaloneApkApiRequest` if offline or in standalone-only mode.
+  - **Settings Cloud Sync Card**: Lets the user view current connection mode (`Standalone Offline` vs. `Synced with Oracle Server`), enter or reset the server URL, and run a 1-tap `Test Connection` check against `/api/health`.
+  - **Oracle Cloud Bootstrap & Update Scripts**:
+    - First-time VM setup script configures Ubuntu `iptables`/UFW for ports `80/443`, installs Docker & Docker Compose, auto-detects the VM's public IP to configure `<PUBLIC_IP>.nip.io` (or custom DuckDNS domain), and launches the stack.
+    - Update script pulls the latest git commits, optionally rebuilds `public/shakti.apk` with the server's live URL baked in, and runs `docker compose up -d --build` with zero database loss.
+  - **GitHub Actions Auto-Deploy Workflow**: Connects via SSH to your Oracle Cloud VM whenever you push changes to `main`/`master` (when repository secrets `ORACLE_HOST`, `ORACLE_USER`, and `ORACLE_SSH_KEY` are configured) and triggers the update script automatically.

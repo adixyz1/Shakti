@@ -1,0 +1,33 @@
+# Caddy Reverse Proxy Configuration for SHAKTI (Oracle Cloud Always Free ARM64 / AMD64)
+# Supports:
+#   - Free IP-based hostname: SHAKTI_DOMAIN=129.154.x.x.nip.io
+#   - Free DuckDNS subdomain: SHAKTI_DOMAIN=yourname.duckdns.org
+#   - Local testing:          SHAKTI_DOMAIN=localhost
+
+{$SHAKTI_DOMAIN:localhost} {
+	encode zstd gzip
+
+	# Block any external attempt to request SQLite database or internal files
+	@blocked {
+		path *.db *.db-wal *.db-shm *.sqlite /data/* /.env*
+	}
+	respond @blocked 404
+
+	# Security headers for HTTPS deployment
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Reverse proxy HTTP, REST API (/api/*), APK download (/shakti.apk), and WebSockets (/ws*) to internal app container
+	reverse_proxy app:3000 {
+		header_up Host {host}
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+		health_uri /health
+		health_interval 30s
+		health_timeout 5s
+	}
+}

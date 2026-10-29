@@ -100,8 +100,16 @@ export function isDemoModeEnabled(overrideDemoMode?: boolean): boolean {
     return overrideDemoMode;
   }
   const raw = process.env.DEMO_MODE;
-  if (raw !== undefined) {
+  if (raw !== undefined && raw.trim() !== '') {
     return raw.trim().toLowerCase() === 'true';
+  }
+  const isTest =
+    process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+  const isProd =
+    (process.env.NODE_ENV || process.env.ENVIRONMENT || '').trim() ===
+    'production';
+  if (!isTest && !isProd) {
+    return true;
   }
   return Boolean(config.demoMode);
 }

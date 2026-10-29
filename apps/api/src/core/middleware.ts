@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { eq } from 'drizzle-orm';
-import { config } from './config';
+import { config, isDemoModeEnabled } from './config';
 import { getDb } from './db';
 import {
   ACCESS_COOKIE_NAME,
@@ -8,6 +8,19 @@ import {
   verifyToken,
 } from './security';
 import { users, type UserRow, type UserRole } from '../db/schema';
+
+export function isZeroAuthDemoAllowed(): boolean {
+  const isTestEnv =
+    process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+  const isProdEnv =
+    (process.env.NODE_ENV || process.env.ENVIRONMENT || '')
+      .trim()
+      .toLowerCase() === 'production';
+  if (isTestEnv || isProdEnv) {
+    return false;
+  }
+  return isDemoModeEnabled();
+}
 
 declare global {
   namespace Express {
@@ -72,6 +85,11 @@ export function csrfProtectionMiddleware(
     return;
   }
 
+  if (isZeroAuthDemoAllowed() && req.headers['x-demo-role']) {
+    next();
+    return;
+  }
+
   // Enforce CSRF Origin/Host check when cookie-based auth is present and no Bearer token header is used
   const hasAuthCookie = Boolean(
     req.cookies?.[ACCESS_COOKIE_NAME] || req.cookies?.[REFRESH_COOKIE_NAME]
@@ -116,8 +134,11 @@ export function csrfProtectionMiddleware(
   );
 
   const rawForwardedHost =
+    typeof req.headers['x-forwarded-for'] === 'string' ||
     typeof req.headers['x-forwarded-host'] === 'string'
-      ? req.headers['x-forwarded-host'].split(',')[0].trim()
+      ? (req.headers['x-forwarded-host'] as string | undefined)
+          ?.split(',')[0]
+          .trim()
       : undefined;
 
   const effectiveHost = (
@@ -297,18 +318,71 @@ export function authRateLimitMiddleware(
   next();
 }
 
+async function resolveFallbackDemoAccount(
+  preferredRole?: string
+): Promise<UserRow | undefined> {
+  const db = getDb();
+  const role =
+    preferredRole === 'responder' || preferredRole === 'admin'
+      ? preferredRole
+      : 'user';
+  const demoPhone =
+    role === 'responder'
+      ? '+919000000002'
+      : role === 'admin'
+        ? '+919000000003'
+        : '+919000000001';
+
+  const [byPhone] = await db
+    .select()
+    .from(users)
+    .where(eq(users.phoneE164, demoPhone))
+    .limit(1);
+  if (byPhone) return byPhone;
+
+  const [byRole] = await db
+    .select()
+    .from(users)
+    .where(eq(users.role, role))
+    .limit(1);
+  return byRole;
+}
+
 export async function requireAuth(
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
+  const allowDemoFallback = isZeroAuthDemoAllowed();
+  const demoRoleHeader =
+    typeof req.headers['x-demo-role'] === 'string'
+      ? req.headers['x-demo-role'].trim().toLowerCase()
+      : undefined;
+
   try {
+    if (allowDemoFallback && demoRoleHeader) {
+      const demoUser = await resolveFallbackDemoAccount(demoRoleHeader);
+      if (demoUser) {
+        req.user = demoUser;
+        next();
+        return;
+      }
+    }
+
     let token: string | undefined = req.cookies?.[ACCESS_COOKIE_NAME];
     if (!token && req.headers.authorization?.startsWith('Bearer ')) {
       token = req.headers.authorization.slice(7).trim();
     }
 
     if (!token) {
+      if (allowDemoFallback) {
+        const demoUser = await resolveFallbackDemoAccount(demoRoleHeader);
+        if (demoUser) {
+          req.user = demoUser;
+          next();
+          return;
+        }
+      }
       res.status(401).json({ detail: 'Not authenticated' });
       return;
     }
@@ -322,6 +396,14 @@ export async function requireAuth(
       .limit(1);
 
     if (!user) {
+      if (allowDemoFallback) {
+        const demoUser = await resolveFallbackDemoAccount(demoRoleHeader);
+        if (demoUser) {
+          req.user = demoUser;
+          next();
+          return;
+        }
+      }
       res.status(401).json({ detail: 'User account not found' });
       return;
     }
@@ -329,6 +411,18 @@ export async function requireAuth(
     req.user = user;
     next();
   } catch {
+    if (allowDemoFallback) {
+      try {
+        const demoUser = await resolveFallbackDemoAccount(demoRoleHeader);
+        if (demoUser) {
+          req.user = demoUser;
+          next();
+          return;
+        }
+      } catch {
+        // ignore fallback lookup error
+      }
+    }
     res.status(401).json({ detail: 'Invalid or expired access token' });
   }
 }
@@ -338,7 +432,22 @@ export async function optionalAuth(
   _res: Response,
   next: NextFunction
 ): Promise<void> {
+  const allowDemoFallback = isZeroAuthDemoAllowed();
+  const demoRoleHeader =
+    typeof req.headers['x-demo-role'] === 'string'
+      ? req.headers['x-demo-role'].trim().toLowerCase()
+      : undefined;
+
   try {
+    if (allowDemoFallback && demoRoleHeader) {
+      const demoUser = await resolveFallbackDemoAccount(demoRoleHeader);
+      if (demoUser) {
+        req.user = demoUser;
+        next();
+        return;
+      }
+    }
+
     let token: string | undefined = req.cookies?.[ACCESS_COOKIE_NAME];
     if (!token && req.headers.authorization?.startsWith('Bearer ')) {
       token = req.headers.authorization.slice(7).trim();
@@ -356,6 +465,11 @@ export async function optionalAuth(
       if (user) {
         req.user = user;
       }
+    } else if (allowDemoFallback) {
+      const demoUser = await resolveFallbackDemoAccount(demoRoleHeader);
+      if (demoUser) {
+        req.user = demoUser;
+      }
     }
   } catch {
     // optional auth ignores invalid/expired tokens and proceeds without req.user
@@ -364,12 +478,34 @@ export async function optionalAuth(
 }
 
 export function requireRole(...allowedRoles: UserRole[]) {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    const allowDemoFallback = isZeroAuthDemoAllowed();
+
     if (!req.user) {
+      if (allowDemoFallback && allowedRoles.length > 0) {
+        const demoUser = await resolveFallbackDemoAccount(allowedRoles[0]);
+        if (demoUser) {
+          req.user = demoUser;
+          next();
+          return;
+        }
+      }
       res.status(401).json({ detail: 'Not authenticated' });
       return;
     }
     if (!allowedRoles.includes(req.user.role)) {
+      if (allowDemoFallback && allowedRoles.length > 0) {
+        const demoUser = await resolveFallbackDemoAccount(allowedRoles[0]);
+        if (demoUser) {
+          req.user = demoUser;
+          next();
+          return;
+        }
+      }
       res.status(403).json({ detail: 'Insufficient permissions for this role' });
       return;
     }

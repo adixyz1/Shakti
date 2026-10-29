@@ -9,8 +9,12 @@ import {
 } from '../core/config';
 import { setAuthCookies, ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from '../core/security';
 import { isValidWebSocketOrigin } from '../services/wsHub';
-import { csrfProtectionMiddleware } from '../core/middleware';
+import { csrfProtectionMiddleware, isZeroAuthDemoAllowed } from '../core/middleware';
 import { recoverPendingIncidentsOnStartup } from '../services/scheduler';
+import { backupDatabase, restoreDatabaseFromBackup, initDatabase } from '../core/db';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
 describe('MVP Deployment Settings (Hosting, Proxy, Cookies, CSRF, WebSocket, Secrets, Health)', () => {
   const originalEnv = { ...process.env };
@@ -350,4 +354,71 @@ describe('MVP Deployment Settings (Hosting, Proxy, Cookies, CSRF, WebSocket, Sec
       expect(typeof recoverPendingIncidentsOnStartup).toBe('function');
     });
   });
+
+  // 7. Zero-auth demo mode strictly disabled in production or when DEMO_MODE=false
+  describe('Zero-auth demo mode boundary', () => {
+    it('disallows X-Demo-Role and fallback demo accounts when NODE_ENV=production or DEMO_MODE=false', () => {
+      delete process.env.VITEST;
+
+      process.env.NODE_ENV = 'production';
+      process.env.ENVIRONMENT = 'production';
+      process.env.DEMO_MODE = 'true';
+      expect(isZeroAuthDemoAllowed()).toBe(false);
+
+      process.env.NODE_ENV = 'staging';
+      process.env.ENVIRONMENT = 'staging';
+      process.env.DEMO_MODE = 'false';
+      expect(isZeroAuthDemoAllowed()).toBe(false);
+
+      process.env.NODE_ENV = 'staging';
+      process.env.ENVIRONMENT = 'staging';
+      process.env.DEMO_MODE = 'true';
+      expect(isZeroAuthDemoAllowed()).toBe(true);
+    });
+  });
+
+  // 8. HTTP guard against direct database file access
+  describe('Database file HTTP exposure protection', () => {
+    it('returns 404 for any request targeting .db, .db-wal, .db-shm, .sqlite, or /data/*', async () => {
+      const app = createApp();
+      for (const blockedPath of [
+        '/saathi.db',
+        '/shakti.db',
+        '/saathi.db-wal',
+        '/saathi.db-shm',
+        '/data/shakti.db',
+        '/backup.sqlite',
+      ]) {
+        const res = await request(app).get(blockedPath);
+        expect(res.status).toBe(404);
+      }
+    });
+  });
+
+  // 9. Atomic SQLite WAL-safe backup and restore
+  describe('Atomic SQLite backup and restore across updates', () => {
+    it('creates a consistent VACUUM INTO backup and restores it cleanly to a target database path', async () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'shakti-db-test-'));
+      const sourceFile = path.join(tmpDir, 'shakti-source.db');
+      const backupFile = path.join(tmpDir, 'shakti-backup.db');
+      const restoredFile = path.join(tmpDir, 'shakti-restored.db');
+
+      try {
+        await initDatabase(`file:${sourceFile}`);
+
+        const savedBackupPath = await backupDatabase(backupFile);
+        expect(fs.existsSync(savedBackupPath)).toBe(true);
+        expect(fs.statSync(savedBackupPath).size).toBeGreaterThan(0);
+
+        const restoredDb = await restoreDatabaseFromBackup(backupFile, `file:${restoredFile}`);
+        expect(restoredDb).toBeDefined();
+        expect(fs.existsSync(restoredFile)).toBe(true);
+        expect(fs.statSync(restoredFile).size).toBeGreaterThan(0);
+      } finally {
+        await initDatabase('file::memory:');
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+  });
 });
+

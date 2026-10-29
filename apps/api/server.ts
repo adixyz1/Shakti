@@ -10,7 +10,7 @@ import {
   assertValidProductionConfiguration,
   config,
 } from './src/core/config';
-import { initDatabase } from './src/core/db';
+import { closeDatabase, initDatabase } from './src/core/db';
 import {
   csrfProtectionMiddleware,
   securityHeadersMiddleware,
@@ -28,8 +28,12 @@ import { reportsRouter } from './src/routes/reports';
 import { resourcesPulseRouter } from './src/routes/resourcesPulse';
 import { responderRouter } from './src/routes/responder';
 import { safetyToolsRouter } from './src/routes/safetyTools';
-import { startRetentionPurgeSchedule } from './src/services/retentionService';
 import {
+  startRetentionPurgeSchedule,
+  stopRetentionPurgeSchedule,
+} from './src/services/retentionService';
+import {
+  clearAllScheduledTimers,
   recoverActiveJourneysOnStartup,
   recoverPendingIncidentsOnStartup,
 } from './src/services/scheduler';
@@ -62,6 +66,21 @@ export function createApp(): Express {
   }
 
   app.use(securityHeadersMiddleware);
+  // Explicitly block any HTTP access to SQLite database or WAL/SHM artifacts
+  app.use((req, res, next) => {
+    const cleanPath = (req.path || '').toLowerCase();
+    if (
+      cleanPath.endsWith('.db') ||
+      cleanPath.endsWith('.db-wal') ||
+      cleanPath.endsWith('.db-shm') ||
+      cleanPath.endsWith('.sqlite') ||
+      cleanPath.startsWith('/data/')
+    ) {
+      res.status(404).json({ detail: 'Not found' });
+      return;
+    }
+    next();
+  });
   app.use(express.json({ limit: '64kb' }));
   app.use(cookieParser());
   app.use(csrfProtectionMiddleware);
@@ -192,7 +211,7 @@ export async function startServer(
   const app = createApp();
   const server = http.createServer(app);
 
-  attachWebSocketServer(server);
+  const wss = attachWebSocketServer(server);
 
   if (
     process.env.NODE_ENV !== 'production' &&
@@ -206,11 +225,39 @@ export async function startServer(
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, { dotfiles: 'deny' }));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  let shuttingDown = false;
+  const gracefulShutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info(`[SAATHI Server] Received ${signal}, initiating graceful shutdown...`);
+    stopRetentionPurgeSchedule();
+    clearAllScheduledTimers();
+    for (const client of wss.clients) {
+      try {
+        client.close(1001, 'Server shutting down');
+      } catch {
+        // ignore
+      }
+    }
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
+    await closeDatabase();
+    isServerStarted = false;
+  };
+
+  process.once('SIGTERM', () => {
+    void gracefulShutdown('SIGTERM').finally(() => process.exit(0));
+  });
+  process.once('SIGINT', () => {
+    void gracefulShutdown('SIGINT').finally(() => process.exit(0));
+  });
 
   const isDev = process.env.NODE_ENV !== 'production';
   const listenPort = Number(

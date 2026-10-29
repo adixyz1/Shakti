@@ -1,28 +1,63 @@
-version: "3.9"
-
 services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: shakti-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      - SHAKTI_DOMAIN=${SHAKTI_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - shakti_net
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: shakti-app
     restart: unless-stopped
+    expose:
+      - "3000"
     ports:
-      - "${PORT:-3000}:3000"
+      - "127.0.0.1:${PORT:-3000}:3000"
     environment:
-      - NODE_ENV=${NODE_ENV:-development}
+      - NODE_ENV=${NODE_ENV:-staging}
+      - SERVE_STATIC=true
       - DEMO_MODE=${DEMO_MODE:-true}
       - COOKIE_SECURE=${COOKIE_SECURE:-true}
       - TRUST_PROXY=${TRUST_PROXY:-1}
       - PORT=3000
       - DATABASE_URL=${DATABASE_URL:-file:/data/shakti.db}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-saathi-dev-secret-key-change-in-production}
-      - HMAC_SECRET_KEY=${HMAC_SECRET_KEY:-saathi-dev-secret-key-change-in-production}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?Set a strong 32+ char JWT_SECRET_KEY in .env}
+      - HMAC_SECRET_KEY=${HMAC_SECRET_KEY:?Set a strong 32+ char HMAC_SECRET_KEY in .env}
       - DEMO_ADMIN_HINT=${DEMO_ADMIN_HINT:-}
       - ALLOW_MOCK_PROVIDERS=${ALLOW_MOCK_PROVIDERS:-true}
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://localhost}
+      - ANDROID_TWA_PACKAGE_NAME=${ANDROID_TWA_PACKAGE_NAME:-app.shakti.safety.twa}
+      - ANDROID_TWA_SHA256_FINGERPRINT=${ANDROID_TWA_SHA256_FINGERPRINT:-}
     volumes:
       - shakti_data:/data
+    networks:
+      - shakti_net
 
 volumes:
   shakti_data:
     name: shakti_data
+  caddy_data:
+    name: shakti_caddy_data
+  caddy_config:
+    name: shakti_caddy_config
+
+networks:
+  shakti_net:
+    driver: bridge
+

@@ -33,6 +33,7 @@ import {
   isDeviceMotionSupported,
 } from '../components/DiscreetTriggersManager';
 import { DisguiseCalculator } from '../components/DisguiseCalculator';
+import { ServerConnectionCard } from '../components/ServerConnectionCard';
 
 type PinSetupTarget = 'cancel' | 'duress' | null;
 
@@ -2014,6 +2015,13 @@ export const SettingsPage: React.FC = () => {
               )}
             </Card>
           )}
+        </section>
+
+        <section
+          aria-label="Hybrid server connection settings"
+          className="space-y-4 pt-2"
+        >
+          <ServerConnectionCard />
         </section>
       </div>
     </PageLayout>

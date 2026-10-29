@@ -8,6 +8,10 @@ import { LoudAlarmModal } from '../components/LoudAlarmModal';
 import { authApi, ApiError } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import { useDemoStore } from '../store/demoStore';
+import {
+  isPrototypeZeroAuthMode,
+  switchStandalonePrototypeRole,
+} from '../lib/standaloneApkApi';
 
 export const LoginPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -76,6 +80,24 @@ export const LoginPage: React.FC = () => {
     setPhone(demoPhone);
     setStep('phone');
     setError(undefined);
+    if (isPrototypeZeroAuthMode()) {
+      const role =
+        demoPhone === '+919000000002'
+          ? 'responder'
+          : demoPhone === '+919000000003'
+            ? 'admin'
+            : 'user';
+      const demoUser = switchStandalonePrototypeRole(role);
+      setUser(demoUser);
+      addToast(t('home.welcomeBack', { name: demoUser.name }), 'success');
+      navigate(
+        role === 'responder'
+          ? '/responder'
+          : role === 'admin'
+            ? '/admin'
+            : '/home'
+      );
+    }
   };
 
   return (

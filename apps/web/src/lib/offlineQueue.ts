@@ -706,3 +706,59 @@ export function buildSmsFallbackHref(
 
   return `sms:${cleaned.join(',')}?body=${encodedBody}`;
 }
+
+export type SosDeliveryState =
+  | 'saved_locally'
+  | 'pending'
+  | 'submitted'
+  | 'server_acknowledged'
+  | 'contact_notification_confirmed';
+
+export function resolveSosDeliveryState(options: {
+  incident: {
+    id: string;
+    status: string;
+    notifications?: Array<{ status: string }>;
+  } | null;
+  queuedAlert: QueuedSosAlert | null;
+  isSubmitting?: boolean;
+}): SosDeliveryState {
+  if (options.isSubmitting) {
+    return 'submitted';
+  }
+  if (
+    options.queuedAlert ||
+    options.incident?.id?.startsWith('queued_') ||
+    options.incident?.id?.startsWith('guest_')
+  ) {
+    if (
+      options.queuedAlert &&
+      (options.queuedAlert.attempts > 0 ||
+        options.queuedAlert.status === 'retrying' ||
+        options.queuedAlert.status === 'needs_reauth')
+    ) {
+      return 'pending';
+    }
+    return 'saved_locally';
+  }
+
+  if (options.incident) {
+    const st = options.incident.status;
+    const hasConfirmedNotif = Boolean(
+      options.incident.notifications?.some((n) => n.status === 'sent')
+    );
+    if (
+      st === 'NOTIFIED' ||
+      st === 'ACKNOWLEDGED' ||
+      st === 'RESPONDING' ||
+      st === 'ESCALATED' ||
+      hasConfirmedNotif
+    ) {
+      return 'contact_notification_confirmed';
+    }
+    return 'server_acknowledged';
+  }
+
+  return 'saved_locally';
+}
+

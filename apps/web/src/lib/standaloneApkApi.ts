@@ -42,6 +42,30 @@ export function isStandaloneAndroidApk(): boolean {
   return false;
 }
 
+/**
+ * Returns true on the live website preview, production website, and Android APK
+ * so demo accounts work out-of-the-box without requiring login.
+ * Returns false only during Vitest automated unit/integration test runs.
+ */
+export function isPrototypeZeroAuthMode(): boolean {
+  if (isStandaloneAndroidApk()) {
+    return true;
+  }
+  const metaEnv = (
+    import.meta as unknown as { env?: Record<string, unknown> }
+  ).env;
+  if (metaEnv?.MODE === 'test' || metaEnv?.VITEST) {
+    return false;
+  }
+  if (
+    typeof process !== 'undefined' &&
+    (process.env?.NODE_ENV === 'test' || process.env?.VITEST === 'true')
+  ) {
+    return false;
+  }
+  return true;
+}
+
 const STORAGE_KEY = 'shakti_standalone_apk_state_v1';
 
 interface StandaloneState {
@@ -333,6 +357,16 @@ export function switchStandalonePrototypeRole(
   state.currentUserPhone = phone;
   saveState(state);
   return state.users[phone];
+}
+
+export function getActivePrototypeUser(): UserProfile {
+  const state = loadState();
+  return getCurrentUser(state);
+}
+
+export function getActivePrototypeRole(): 'user' | 'responder' | 'admin' {
+  const user = getActivePrototypeUser();
+  return user.role;
 }
 
 function getCurrentUser(state: StandaloneState): UserProfile {

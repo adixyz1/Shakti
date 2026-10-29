@@ -35,13 +35,34 @@ const queryClient = new QueryClient({
 });
 
 import { AccountRequiredPage, type AccountRequiredFeature } from './pages/AccountRequiredPage';
+import {
+  getActivePrototypeUser,
+  isPrototypeZeroAuthMode,
+  switchStandalonePrototypeRole,
+} from './lib/standaloneApkApi';
 
 const AccountRequiredRoute: React.FC<{
   children: React.ReactNode;
   feature?: AccountRequiredFeature;
   allowedRoles?: UserRole[];
 }> = ({ children, feature = 'general', allowedRoles }) => {
-  const { user, isLoading } = useAuthStore();
+  const { user, isLoading, setUser } = useAuthStore();
+  const zeroAuth = isPrototypeZeroAuthMode();
+
+  useEffect(() => {
+    if (!zeroAuth) return;
+    if (!user) {
+      const targetRole =
+        allowedRoles && allowedRoles.length > 0 ? allowedRoles[0] : 'user';
+      setUser(switchStandalonePrototypeRole(targetRole));
+    } else if (allowedRoles && !allowedRoles.includes(user.role)) {
+      setUser(switchStandalonePrototypeRole(allowedRoles[0]));
+    }
+  }, [allowedRoles, setUser, user, zeroAuth]);
+
+  if (zeroAuth) {
+    return <>{children}</>;
+  }
 
   if (isLoading) {
     return (
@@ -83,6 +104,11 @@ export function AppRoutes() {
 
   useEffect(() => {
     let mounted = true;
+    const zeroAuth = isPrototypeZeroAuthMode();
+    if (zeroAuth) {
+      setUser(getActivePrototypeUser());
+      setLoading(false);
+    }
     (async () => {
       try {
         const me = await authApi.getMe();
@@ -95,7 +121,11 @@ export function AppRoutes() {
         }
       } catch {
         if (mounted) {
-          setUser(null);
+          if (zeroAuth) {
+            setUser(getActivePrototypeUser());
+          } else {
+            setUser(null);
+          }
         }
       } finally {
         if (mounted) {

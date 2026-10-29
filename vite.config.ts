@@ -21,6 +21,7 @@ export default defineConfig(() => {
           'icons/icon-512x512.png',
         ],
         workbox: {
+          maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,json,webmanifest,woff2}'],
           navigateFallback: '/index.html',
           navigateFallbackDenylist: [
